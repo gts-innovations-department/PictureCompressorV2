@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en" class="bg-zinc-950 text-white">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>27MB Photo Compressor</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://raw.githubusercontent.com/alexcorvi/heic2any/master/dist/heic2any.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <style>
+    body { font-family: system-ui, sans-serif; }
+    canvas { display: none; }
+  </style>
+</head>
+<body class="min-h-screen">
+  <div class="max-w-4xl mx-auto p-8">
+    <h1 class="text-4xl font-bold mb-2">27MB Photo Compressor</h1>
+    <p class="text-zinc-400 mb-8">Select a folder → auto-compresses to under your target size → download ZIP</p>
+
+    <input type="file" id="folderInput" webkitdirectory directory multiple class="hidden" onchange="handleFolder(event)">
+    
+    <button onclick="document.getElementById('folderInput').click()" 
+            class="bg-blue-600 hover:bg-blue-700 px-8 py-4 rounded-2xl text-xl font-medium transition">
+      📁 Select Folder of Pictures
+    </button>
+
+    <div id="status" class="mt-6 text-sm"></div>
+    
+    <div id="filesSection" class="hidden mt-8">
+      <div class="flex justify-between items-center mb-4">
+        <h2 id="fileCount" class="text-lg font-semibold"></h2>
+        <div class="text-right">
+          <p class="text-zinc-400 text-sm">Original total</p>
+          <p id="origTotal" class="text-2xl font-mono font-bold text-emerald-400"></p>
+        </div>
+      </div>
+      
+      <div class="bg-zinc-900 rounded-3xl p-6 max-h-96 overflow-auto" id="fileList"></div>
+    </div>
+
+    <div id="controls" class="hidden mt-8 bg-zinc-900 rounded-3xl p-8">
+      <label class="block text-sm text-zinc-400 mb-2">Target total size (MB)</label>
+      <input id="targetMB" type="number" value="27" step="0.1" min="1" 
+             class="bg-zinc-800 text-3xl font-mono w-32 px-4 py-3 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500">
+      
+      <button onclick="findOptimalQuality()" 
+              class="mt-6 w-full bg-white text-black hover:bg-gray-200 font-semibold py-4 rounded-2xl text-lg transition">
+        🔍 Find best quality to stay under target
+      </button>
+    </div>
+
+    <div id="progress" class="hidden mt-8 bg-zinc-900 rounded-3xl p-8 text-center">
+      <div class="animate-pulse text-blue-400" id="progressText">Testing quality...</div>
+    </div>
+
+    <div id="result" class="hidden mt-8 bg-emerald-950 border border-emerald-500 rounded-3xl p-8">
+      <div class="flex justify-between items-center">
+        <div>
+          <p class="text-emerald-400 text-sm">OPTIMAL QUALITY FOUND</p>
+          <p id="optimalQuality" class="text-6xl font-mono font-bold">85%</p>
+        </div>
+        <div class="text-right">
+          <p class="text-emerald-400 text-sm">NEW TOTAL SIZE</p>
+          <p id="newTotal" class="text-4xl font-mono font-bold text-emerald-400">26.4 MB</p>
+        </div>
+      </div>
+      <button onclick="compressAndDownload()" 
+              class="mt-8 w-full bg-emerald-500 hover:bg-emerald-600 text-black font-bold py-5 rounded-2xl text-xl transition">
+        ⬇️ Download Compressed ZIP
+      </button>
+    </div>
+  </div>
+
+  <script>
+    let loadedImages = []; // {name, origSize, img, preloadUrl}
+    let optimalQuality = 1.0;
+    let targetBytes = 27 * 1024 * 1024;
+
+    function isImageFile(file) {
+      const ext = file.name.toLowerCase();
+      return /\.(jpg|jpeg|png|heic|webp|gif|bmp)$/i.test(ext) || file.type.startsWith('image/');
+    }
+
+    async function handleFolder(e) {
+      const files = Array.from(e.target.files).filter(isImageFile);
+      if (files.length === 0) return alert("No image files found in folder.");
+
+      document.getElementById('status').innerHTML = `Loading ${files.length} images...`;
+      loadedImages = [];
+
+      for (const file of files) {
+        let blob = file;
+        let displayName = file.name;
+
+        // Convert HEIC → JPEG at full quality first
+        if (file.name.toLowerCase().endsWith('.heic') || file.type === 'image/heic') {
+          try {
+            const converted = await heic2any({ blob: file, toType: 'image/jpeg', quality: 1 });
+            blob = converted;
+            displayName = displayName.replace(/\.heic$/i, '.jpg');
+          } catch (err) {
+            console.error("HEIC conversion failed", err);
+            continue;
+          }
+        }
+
+        const url = URL.createObjectURL(blob);
+        const img = new Image();
+        img.src = url;
+        await new Promise(r => { img.onload = r; img.onerror = r; });
+
+        loadedImages.push({
+          name: displayName.replace(/\.\w+$/i, '.jpg'), // force .jpg on output
+          origName: file.name,
+          origSize: file.size,
+          img: img,
+          preloadUrl: url
+        });
+      }
+
+      renderFileList();
+      document.getElementById('filesSection').classList.remove('hidden');
+      document.getElementById('controls').classList.remove('hidden');
+      document.getElementById('status').innerHTML = `Ready — ${loadedImages.length} images loaded`;
+    }
+
+    function renderFileList() {
+      const total = loadedImages.reduce((sum, i) => sum + i.origSize, 0);
+      const totalMB = (total / 1024 / 1024).toFixed(2);
+
+      document.getElementById('fileCount').textContent = `${loadedImages.length} photos`;
+      document.getElementById('origTotal').textContent = `${totalMB} MB`;
+
+      let html = `<table class="w-full text-sm"><thead><tr class="text-zinc-500"><th class="text-left py-2">Filename</th><th class="text-right py-2">Size</th></tr></thead><tbody>`;
+      loadedImages.forEach(item => {
+        const mb = (item.origSize / 1024 / 1024).toFixed(2);
+        html += `<tr class="border-t border-zinc-800"><td class="py-3">\( {item.origName}</td><td class="text-right font-mono"> \){mb} MB</td></tr>`;
+      });
+      html += `</tbody></table>`;
+      document.getElementById('fileList').innerHTML = html;
+    }
+
+    async function getCompressedBlobs(quality) {
+      return Promise.all(loadedImages.map(async item => {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = item.img.width;
+        canvas.height = item.img.height;
+        ctx.drawImage(item.img, 0, 0);
+
+        const blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', quality));
+        return { name: item.name, blob: blob, size: blob.size };
+      }));
+    }
+
+    async function getTotalSize(quality) {
+      const items = await getCompressedBlobs(quality);
+      return items.reduce((sum, i) => sum + i.size, 0);
+    }
+
+    async function findOptimalQuality() {
+      const targetInput = parseFloat(document.getElementById('targetMB').value) || 27;
+      targetBytes = targetInput * 1024 * 1024;
+
+      const origTotal = loadedImages.reduce((sum, i) => sum + i.origSize, 0);
+      if (origTotal <= targetBytes) {
+        optimalQuality = 1.0;
+        showResult(1.0, origTotal);
+        return;
+      }
+
+      document.getElementById('progress').classList.remove('hidden');
+      document.getElementById('result').classList.add('hidden');
+
+      let low = 0.1, high = 1.0;
+      let bestQ = 0.1;
+      let bestTotal = Infinity;
+
+      for (let i = 0; i < 12; i++) { // enough for \~0.02% precision
+        const mid = (low + high) / 2;
+        const total = await getTotalSize(mid);
+        const totalMB = (total / 1024 / 1024).toFixed(1);
+
+        document.getElementById('progressText').innerHTML = 
+          `Testing quality <span class="font-mono">${Math.round(mid*100)}%</span><br>New total: ${totalMB} MB`;
+
+        if (total <= targetBytes) {
+          bestQ = mid;
+          bestTotal = total;
+          low = mid;
+        } else {
+          high = mid;
+        }
+      }
+
+      document.getElementById('progress').classList.add('hidden');
+      optimalQuality = Math.max(bestQ, 0.1);
+      showResult(optimalQuality, bestTotal);
+    }
+
+    function showResult(q, totalBytes) {
+      const totalMB = (totalBytes / 1024 / 1024).toFixed(1);
+      document.getElementById('optimalQuality').textContent = Math.round(q * 100) + '%';
+      document.getElementById('newTotal').textContent = `${totalMB} MB`;
+      document.getElementById('result').classList.remove('hidden');
+    }
+
+    async function compressAndDownload() {
+      const btn = document.querySelector('#result button');
+      const originalText = btn.textContent;
+      btn.textContent = 'Compressing...';
+      btn.disabled = true;
+
+      const items = await getCompressedBlobs(optimalQuality);
+
+      const zip = new JSZip();
+      items.forEach(item => zip.file(item.name, item.blob));
+
+      const zipBlob = await zip.generateAsync({ type: 'blob' });
+      const url = URL.createObjectURL(zipBlob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `compressed_under_${document.getElementById('targetMB').value}MB.zip`;
+      a.click();
+      URL.revokeObjectURL(url);
+
+      btn.textContent = originalText;
+      btn.disabled = false;
+    }
+
+    // Cleanup memory when page unloads
+    window.addEventListener('beforeunload', () => {
+      loadedImages.forEach(item => URL.revokeObjectURL(item.preloadUrl));
+    });
+  </script>
+</body>
+</html>
