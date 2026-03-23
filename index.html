@@ -1,3 +1,40 @@
+Re: Testing Pictures
+
+Micah Burket
+
+​
+Micah Burket​
+
+
+Micah C. Burket
+Construction Supervisor Sr.
+706-524-6935
+mburket@gts-yes.com
+
+From: Micah Burket <mburket@gts-yes.com>
+Sent: Monday, March 23, 2026 12:30:55 PM
+To: Micah Burket <mburket@gts-yes.com>
+Subject: Re: Testing Pictures
+ 
+
+From: Micah Burket <mburket@gts-yes.com>
+Sent: Monday, March 23, 2026 11:31 AM
+To: Micah Burket <mburket@gts-yes.com>
+Subject: Testing Pictures
+ 
+
+
+Micah C. Burket
+
+Construction Supervisor Sr.
+
+706-524-6935
+
+mburket@gts-yes.com
+
+ 
+
+
 <!DOCTYPE html>
 <html lang="en" class="bg-zinc-950 text-white">
 <head>
@@ -5,7 +42,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>27MB Photo Compressor</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://raw.githubusercontent.com/alexcorvi/heic2any/master/dist/heic2any.min.js"></script>
+  <!-- Updated: heic-to (modern replacement for heic2any) -->
+  <script src="https://cdn.jsdelivr.net/npm/heic-to@1.4.2/dist/iife/heic-to.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <style>
     body { font-family: system-ui, sans-serif; }
@@ -15,7 +53,7 @@
 <body class="min-h-screen">
   <div class="max-w-4xl mx-auto p-8">
     <h1 class="text-4xl font-bold mb-2">27MB Photo Compressor</h1>
-    <p class="text-zinc-400 mb-8">Select a folder → auto-compresses to under your target size → download ZIP</p>
+    <p class="text-zinc-400 mb-8">Select a folder → auto-compresses to under your target size → download ZIP (supports JPEG, HEIC/HEIF, PNG, WEBP, etc.)</p>
 
     <input type="file" id="folderInput" webkitdirectory directory multiple class="hidden" onchange="handleFolder(event)">
     
@@ -78,39 +116,59 @@
 
     function isImageFile(file) {
       const ext = file.name.toLowerCase();
-      return /\.(jpg|jpeg|png|heic|webp|gif|bmp)$/i.test(ext) || file.type.startsWith('image/');
+      return /\.(jpg|jpeg|png|heic|heif|webp|gif|bmp)$/i.test(ext) || file.type.startsWith('image/');
     }
 
     async function handleFolder(e) {
       const files = Array.from(e.target.files).filter(isImageFile);
       if (files.length === 0) return alert("No image files found in folder.");
 
-      document.getElementById('status').innerHTML = `Loading ${files.length} images...`;
+      document.getElementById('status').innerHTML = `Loading ${files.length} images... (HEIC/HEIF conversion may take a moment)`;
       loadedImages = [];
+      let skipped = 0;
 
       for (const file of files) {
         let blob = file;
         let displayName = file.name;
 
-        // Convert HEIC → JPEG at full quality first
-        if (file.name.toLowerCase().endsWith('.heic') || file.type === 'image/heic') {
+        // Convert HEIC/HEIF → JPEG at high quality first
+        if (/\.(heic|heif)$/i.test(file.name) || file.type === 'image/heic' || file.type === 'image/heif') {
           try {
-            const converted = await heic2any({ blob: file, toType: 'image/jpeg', quality: 1 });
-            blob = converted;
-            displayName = displayName.replace(/\.heic$/i, '.jpg');
+            const convertedBlob = await HeicTo.heicTo({
+              blob: file,
+              type: 'image/jpeg',
+              quality: 0.98  // near-lossless initial conversion
+            });
+            blob = convertedBlob;
+            displayName = displayName.replace(/\.(heic|heif)$/i, '.jpg');
           } catch (err) {
-            console.error("HEIC conversion failed", err);
-            continue;
+            console.error(`HEIC conversion failed for ${file.name}:`, err);
+            skipped++;
+            continue; // skip bad file
           }
         }
 
         const url = URL.createObjectURL(blob);
         const img = new Image();
         img.src = url;
-        await new Promise(r => { img.onload = r; img.onerror = r; });
+
+        await new Promise((resolve) => {
+          img.onload = resolve;
+          img.onerror = () => {
+            console.warn(`Image load failed: ${file.name}`);
+            skipped++;
+            resolve(); // still resolve to continue
+          };
+        });
+
+        if (img.naturalWidth === 0 || img.naturalHeight === 0) {
+          skipped++;
+          URL.revokeObjectURL(url);
+          continue;
+        }
 
         loadedImages.push({
-          name: displayName.replace(/\.\w+$/i, '.jpg'), // force .jpg on output
+          name: displayName.replace(/\.\w+$/i, '.jpg'), // force output as .jpg
           origName: file.name,
           origSize: file.size,
           img: img,
@@ -121,7 +179,10 @@
       renderFileList();
       document.getElementById('filesSection').classList.remove('hidden');
       document.getElementById('controls').classList.remove('hidden');
-      document.getElementById('status').innerHTML = `Ready — ${loadedImages.length} images loaded`;
+
+      let msg = `Ready — ${loadedImages.length} images loaded`;
+      if (skipped > 0) msg += ` (${skipped} skipped due to errors)`;
+      document.getElementById('status').innerHTML = msg;
     }
 
     function renderFileList() {
@@ -176,7 +237,7 @@
       let bestQ = 0.1;
       let bestTotal = Infinity;
 
-      for (let i = 0; i < 12; i++) { // enough for \~0.02% precision
+      for (let i = 0; i < 12; i++) { // binary search iterations for precision
         const mid = (low + high) / 2;
         const total = await getTotalSize(mid);
         const totalMB = (total / 1024 / 1024).toFixed(1);
@@ -228,7 +289,7 @@
       btn.disabled = false;
     }
 
-    // Cleanup memory when page unloads
+    // Cleanup
     window.addEventListener('beforeunload', () => {
       loadedImages.forEach(item => URL.revokeObjectURL(item.preloadUrl));
     });
