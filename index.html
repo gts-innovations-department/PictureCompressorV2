@@ -7,104 +7,69 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/heic-to@1.4.2/dist/iife/heic-to.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
     canvas { display: none; }
-    .spinner {
-      border: 4px solid #f3f3f3;
-      border-top: 4px solid #3b82f6;
-      border-radius: 50%;
-      width: 40px;
-      height: 40px;
-      animation: spin 1s linear infinite;
+    .progress-bar {
+      transition: width 0.4s ease-in-out;
     }
-    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
   </style>
 </head>
 <body class="min-h-screen bg-white">
-  <div class="max-w-5xl mx-auto px-6 py-12">
+
+  <div class="max-w-4xl mx-auto px-6 py-16 text-center">
     <!-- Header -->
-    <div class="text-center mb-12">
-      <h1 class="text-4xl md:text-5xl font-bold text-gray-900">GTS Photo Compressor</h1>
-      <p class="mt-3 text-lg text-gray-600">Compress your photos to stay under any target size — 100% in-browser, private & free</p>
+    <div class="mb-12">
+      <h1 class="text-5xl font-bold text-gray-900">GTS Photo Compressor</h1>
+      <p class="mt-3 text-xl text-gray-600">Compress your photos to stay under any target size — 100% private & in-browser</p>
     </div>
 
     <!-- Upload Button -->
-    <div class="flex justify-center mb-10">
+    <div id="uploadArea">
       <input type="file" id="folderInput" webkitdirectory directory multiple class="hidden" onchange="handleFolder(event)">
       <button onclick="document.getElementById('folderInput').click()"
-              class="bg-blue-600 hover:bg-blue-700 text-white px-10 py-5 rounded-xl text-xl font-semibold shadow-md transition-all transform hover:scale-105">
+              class="bg-blue-600 hover:bg-blue-700 text-white px-12 py-6 rounded-2xl text-2xl font-semibold shadow-lg transition-all hover:scale-105 active:scale-95">
         📂 Select Folder of Photos
       </button>
     </div>
 
-    <!-- Status / Loading -->
-    <div id="status" class="text-center text-gray-600 mb-8 min-h-[2rem]"></div>
-
-    <!-- Files Section -->
-    <div id="filesSection" class="hidden">
-      <div class="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
-        <div class="px-6 py-5 border-b border-gray-200 flex justify-between items-center">
-          <h2 id="fileCount" class="text-xl font-semibold text-gray-900"></h2>
-          <div class="text-right">
-            <p class="text-sm text-gray-500">Original total size</p>
-            <p id="origTotal" class="text-2xl font-bold text-blue-600"></p>
-          </div>
-        </div>
-
-        <div class="max-h-80 overflow-y-auto">
-          <table class="w-full text-sm text-left">
-            <thead class="bg-gray-50 sticky top-0">
-              <tr class="border-b border-gray-200">
-                <th class="px-6 py-4 font-medium text-gray-700">Filename</th>
-                <th class="px-6 py-4 font-medium text-gray-700 text-right">Size</th>
-              </tr>
-            </thead>
-            <tbody id="fileListBody"></tbody>
-          </table>
-        </div>
-      </div>
-
-      <!-- Controls -->
-      <div class="mt-10 bg-white border border-gray-200 rounded-2xl shadow-sm p-8">
-        <label class="block text-sm font-medium text-gray-700 mb-3">Target total size (MB)</label>
-        <input id="targetMB" type="number" value="27" step="0.1" min="1"
-               class="w-36 px-5 py-4 bg-gray-50 border border-gray-300 rounded-xl text-3xl font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="hidden fixed inset-0 bg-white/95 backdrop-blur-md z-50 flex items-center justify-center">
+      <div class="w-full max-w-md px-6">
+        <div class="mx-auto w-16 h-16 border-4 border-gray-200 border-t-blue-600 rounded-full animate-spin mb-6"></div>
         
-        <button onclick="findOptimalQuality()"
-                class="mt-8 w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-5 rounded-xl text-lg shadow-md transition-all transform hover:scale-[1.02]">
-          🔍 Find Best Quality to Stay Under Target
-        </button>
-      </div>
-    </div>
-
-    <!-- Progress / Loading Overlay -->
-    <div id="progress" class="hidden fixed inset-0 bg-white/80 backdrop-blur-sm z-50 flex items-center justify-center">
-      <div class="text-center">
-        <div class="spinner mx-auto mb-6"></div>
-        <p class="text-xl font-medium text-gray-800">Processing images...</p>
-        <p id="progressText" class="mt-3 text-gray-600"></p>
+        <p id="loadingTitle" class="text-2xl font-semibold text-gray-800 mb-2">Loading & Processing...</p>
+        <p id="loadingSubtitle" class="text-gray-600 mb-8">Converting HEIC files and finding best quality</p>
+        
+        <!-- Progress Bar -->
+        <div class="bg-gray-200 h-3 rounded-full overflow-hidden mb-3">
+          <div id="progressBar" class="progress-bar bg-blue-600 h-3 rounded-full w-0"></div>
+        </div>
+        <p id="progressText" class="font-mono text-sm text-gray-500">0%</p>
       </div>
     </div>
 
     <!-- Result -->
-    <div id="result" class="hidden mt-12 bg-white border border-green-200 rounded-2xl shadow-sm p-10 text-center">
-      <p class="text-sm uppercase tracking-wide text-green-600 font-medium mb-2">Optimal Quality Found</p>
-      <p id="optimalQuality" class="text-7xl font-bold text-gray-900">100%</p>
-      <p class="mt-4 text-xl text-gray-600">New total size</p>
-      <p id="newTotal" class="text-5xl font-bold text-green-600 mt-1">4.2 MB</p>
-      
-      <button onclick="compressAndDownload()"
-              class="mt-10 w-full max-w-md mx-auto bg-green-600 hover:bg-green-700 text-white font-bold py-6 rounded-xl text-xl shadow-lg transition-all transform hover:scale-[1.02]">
-        ⬇️ Download Compressed ZIP
-      </button>
+    <div id="result" class="hidden mt-16">
+      <div class="bg-white border border-green-200 rounded-3xl shadow-sm p-12">
+        <p class="text-green-600 font-medium uppercase tracking-widest text-sm mb-3">Ready to Download</p>
+        <p id="optimalQuality" class="text-8xl font-bold text-gray-900">95%</p>
+        <p class="mt-4 text-2xl text-gray-600">Quality • New total size</p>
+        <p id="newTotal" class="text-6xl font-bold text-green-600 mt-1">12.4 MB</p>
+
+        <button onclick="compressAndDownload()"
+                class="mt-12 w-full max-w-md mx-auto bg-green-600 hover:bg-green-700 text-white font-bold py-6 rounded-2xl text-xl shadow-lg transition-all hover:scale-[1.02]">
+          ⬇️ Download Compressed ZIP
+        </button>
+      </div>
     </div>
   </div>
 
   <script>
     let loadedImages = [];
     let optimalQuality = 1.0;
-    let targetBytes = 27 * 1024 * 1024;
+    let targetMB = 27;
 
     function isImageFile(file) {
       const ext = file.name.toLowerCase();
@@ -114,15 +79,25 @@
     async function handleFolder(e) {
       const files = Array.from(e.target.files).filter(isImageFile);
       if (files.length === 0) {
-        document.getElementById('status').innerHTML = '<p class="text-red-600">No image files found in the selected folder.</p>';
+        alert("No image files found in the selected folder.");
         return;
       }
 
-      document.getElementById('status').innerHTML = `<p class="text-blue-600 font-medium">Loading ${files.length} images... (HEIC/HEIF conversion may take a few seconds)</p>`;
+      // Hide upload, show loading
+      document.getElementById('uploadArea').classList.add('hidden');
+      document.getElementById('loadingOverlay').classList.remove('hidden');
+      document.getElementById('result').classList.add('hidden');
+
       loadedImages = [];
+      let processed = 0;
       let skipped = 0;
 
+      // === 1. Load and convert images ===
       for (const file of files) {
+        processed++;
+        const percent = Math.round((processed / files.length) * 40); // First 40% for loading
+        updateProgress(percent, `Loading images... (${processed}/${files.length})`);
+
         let blob = file;
         let displayName = file.name;
 
@@ -142,12 +117,9 @@
         const img = new Image();
         img.src = url;
 
-        await new Promise((resolve) => {
-          img.onload = resolve;
-          img.onerror = () => { skipped++; resolve(); };
-        });
+        await new Promise(r => { img.onload = r; img.onerror = () => { skipped++; r(); }; });
 
-        if (img.naturalWidth === 0 || img.naturalHeight === 0) {
+        if (img.naturalWidth === 0) {
           skipped++;
           URL.revokeObjectURL(url);
           continue;
@@ -155,38 +127,63 @@
 
         loadedImages.push({
           name: displayName.replace(/\.\w+$/i, '.jpg'),
-          origName: file.name,
           origSize: file.size,
-          img,
+          img: img,
           preloadUrl: url
         });
       }
 
-      renderFileList();
-      document.getElementById('filesSection').classList.remove('hidden');
+      if (loadedImages.length === 0) {
+        alert("No valid images could be loaded.");
+        resetUI();
+        return;
+      }
 
-      let msg = `Ready — ${loadedImages.length} images loaded`;
-      if (skipped > 0) msg += ` (${skipped} skipped)`;
-      document.getElementById('status').innerHTML = `<p class="text-green-600 font-medium">${msg}</p>`;
+      // === 2. Automatically find optimal quality ===
+      updateProgress(45, "Finding best compression quality...");
+
+      const targetBytes = targetMB * 1024 * 1024;
+      const origTotal = loadedImages.reduce((sum, i) => sum + i.origSize, 0);
+
+      if (origTotal <= targetBytes) {
+        optimalQuality = 1.0;
+        showResult(1.0, origTotal);
+        return;
+      }
+
+      let low = 0.1, high = 1.0;
+      let bestQ = 0.1;
+      let bestTotal = Infinity;
+
+      for (let i = 0; i < 12; i++) {
+        const mid = (low + high) / 2;
+        const total = await getTotalSize(mid);
+        const progress = 45 + Math.round((i + 1) / 12 * 55); // 45% → 100%
+
+        updateProgress(progress, `Testing quality ${Math.round(mid * 100)}%`);
+
+        if (total <= targetBytes) {
+          bestQ = mid;
+          bestTotal = total;
+          low = mid;
+        } else {
+          high = mid;
+        }
+      }
+
+      optimalQuality = Math.max(bestQ, 0.1);
+      showResult(optimalQuality, bestTotal);
     }
 
-    function renderFileList() {
-      const total = loadedImages.reduce((sum, i) => sum + i.origSize, 0);
-      const totalMB = (total / 1024 / 1024).toFixed(2);
+    function updateProgress(percent, message) {
+      document.getElementById('progressBar').style.width = percent + '%';
+      document.getElementById('progressText').textContent = percent + '%';
+      document.getElementById('loadingTitle').textContent = message;
+    }
 
-      document.getElementById('fileCount').textContent = `${loadedImages.length} photos`;
-      document.getElementById('origTotal').textContent = `${totalMB} MB`;
-
-      let html = '';
-      loadedImages.forEach(item => {
-        const mb = (item.origSize / 1024 / 1024).toFixed(2);
-        html += `
-          <tr class="border-b border-gray-100 hover:bg-gray-50">
-            <td class="px-6 py-4">${item.origName}</td>
-            <td class="px-6 py-4 text-right font-mono text-gray-700">${mb} MB</td>
-          </tr>`;
-      });
-      document.getElementById('fileListBody').innerHTML = html;
+    async function getTotalSize(quality) {
+      const items = await getCompressedBlobs(quality);
+      return items.reduce((sum, i) => sum + i.size, 0);
     }
 
     async function getCompressedBlobs(quality) {
@@ -200,62 +197,19 @@
       }));
     }
 
-    async function getTotalSize(quality) {
-      const items = await getCompressedBlobs(quality);
-      return items.reduce((sum, i) => sum + i.size, 0);
-    }
-
-    async function findOptimalQuality() {
-      const targetInput = parseFloat(document.getElementById('targetMB').value) || 27;
-      targetBytes = targetInput * 1024 * 1024;
-
-      const origTotal = loadedImages.reduce((sum, i) => sum + i.origSize, 0);
-      if (origTotal <= targetBytes) {
-        optimalQuality = 1.0;
-        showResult(1.0, origTotal);
-        return;
-      }
-
-      document.getElementById('progress').classList.remove('hidden');
-      document.getElementById('filesSection').classList.add('opacity-50');
-
-      let low = 0.1, high = 1.0;
-      let bestQ = 0.1;
-      let bestTotal = Infinity;
-
-      for (let i = 0; i < 12; i++) {
-        const mid = (low + high) / 2;
-        const total = await getTotalSize(mid);
-        const totalMB = (total / 1024 / 1024).toFixed(1);
-
-        document.getElementById('progressText').textContent = 
-          `Testing quality ${Math.round(mid*100)}% — ${totalMB} MB`;
-
-        if (total <= targetBytes) {
-          bestQ = mid;
-          bestTotal = total;
-          low = mid;
-        } else {
-          high = mid;
-        }
-      }
-
-      document.getElementById('progress').classList.add('hidden');
-      document.getElementById('filesSection').classList.remove('opacity-50');
-      optimalQuality = Math.max(bestQ, 0.1);
-      showResult(optimalQuality, bestTotal);
-    }
-
     function showResult(q, totalBytes) {
+      document.getElementById('loadingOverlay').classList.add('hidden');
+      document.getElementById('result').classList.remove('hidden');
+
       const totalMB = (totalBytes / 1024 / 1024).toFixed(1);
       document.getElementById('optimalQuality').textContent = Math.round(q * 100) + '%';
       document.getElementById('newTotal').textContent = `${totalMB} MB`;
-      document.getElementById('result').classList.remove('hidden');
     }
 
     async function compressAndDownload() {
       const btn = document.querySelector('#result button');
-      btn.textContent = 'Compressing & Zipping...';
+      const originalText = btn.innerHTML;
+      btn.innerHTML = '⏳ Creating ZIP...';
       btn.disabled = true;
 
       const items = await getCompressedBlobs(optimalQuality);
@@ -266,14 +220,23 @@
       const url = URL.createObjectURL(zipBlob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `compressed_photos_under_${document.getElementById('targetMB').value}MB.zip`;
+      a.download = `compressed_photos_under_${targetMB}MB.zip`;
       a.click();
       URL.revokeObjectURL(url);
 
-      btn.textContent = '⬇️ Download Compressed ZIP';
-      btn.disabled = false;
+      setTimeout(() => {
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+      }, 1200);
     }
 
+    function resetUI() {
+      document.getElementById('uploadArea').classList.remove('hidden');
+      document.getElementById('loadingOverlay').classList.add('hidden');
+      document.getElementById('result').classList.add('hidden');
+    }
+
+    // Cleanup memory
     window.addEventListener('beforeunload', () => {
       loadedImages.forEach(item => URL.revokeObjectURL(item.preloadUrl));
     });
