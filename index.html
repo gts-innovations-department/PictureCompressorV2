@@ -9,14 +9,23 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 
   <style>
-    body { 
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     }
     canvas { display: none; }
     .progress-bar {
       transition: width 0.4s ease-in-out;
     }
-    
+
+    .loading-pulse {
+      animation: pulseText 1s infinite;
+    }
+
+    @keyframes pulseText {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.35; }
+    }
+
     /* Professional GTS-inspired styling */
     .gts-header {
       background: linear-gradient(to bottom, #f8fafc, #ffffff);
@@ -30,66 +39,58 @@
     }
   </style>
 </head>
-<body class="min-h-screen bg-gray-50">
+<body class="min-h-screen bg-gray-50 flex items-center justify-center py-10">
   <div class="max-w-2xl mx-auto bg-white rounded-3xl shadow-2xl p-10 text-center border border-gray-100">
-    
-    <!-- Professional GTS Header / Logo (exactly matching your mockup style) -->
+
     <div class="gts-header mb-10 flex justify-center">
       <div class="text-center">
-        <img src="GTSLOGOV1.png" 
-             alt="Gibson Technical Services" 
+        <img src="GTSLOGOV1.png"
+             alt="Gibson Technical Services"
              class="h-28 mx-auto mb-3 drop-shadow-sm">
         <p class="text-xs tracking-[2px] font-medium text-gray-500">Photo Compressor</p>
       </div>
     </div>
 
-    <!-- Hero Title & Subtitle (clean, corporate, matches mockup) -->
     <div class="mb-16">
-      <h1 class="text-6xl font-semibold tracking-[-1px] text-gray-900 leading-none">
-        
-      </h1>
+      <h1 class="text-6xl font-semibold tracking-[-1px] text-gray-900 leading-none"></h1>
       <p class="mt-5 text-2xl text-gray-600 max-w-2xl mx-auto leading-tight">
         Compress your photos to stay under any target size — 100% private &amp; in-browser
       </p>
     </div>
 
-    <!-- Target Size and Subfolders Controls (new) -->
     <div class="mb-12 flex flex-wrap justify-center items-center gap-x-8 gap-y-6">
       <div class="flex items-center gap-x-4">
         <span class="text-xl font-semibold text-gray-700 whitespace-nowrap">Target size</span>
-        <input id="targetInput" type="number" value="24" min="1" step="1" 
-               class="w-28 text-center text-3xl font-bold border-2 border-gray-300 focus:border-[#0066cc] rounded-3xl px-6 py-3 outline-none">
+        <input id="targetInput" type="number" value="24" min="1" step="1"
+               class="w-40 text-center text-3xl font-bold border-2 border-gray-300 focus:border-[#0066cc] rounded-3xl px-6 py-3 outline-none">
         <span class="text-3xl font-semibold text-gray-700">MB</span>
       </div>
       <div class="flex items-center gap-x-4 bg-gray-50 px-8 py-4 rounded-3xl">
-        <input type="checkbox" id="subsCheckbox" checked 
+        <input type="checkbox" id="subsCheckbox" checked
                class="w-5 h-5 accent-[#0066cc]">
         <label for="subsCheckbox" class="text-xl font-medium text-gray-700 cursor-pointer">Compress all sub folders</label>
       </div>
     </div>
 
-    <!-- Upload Area – Professional blue button exactly like your mockup -->
     <div id="uploadArea" class="mb-20">
       <input type="file" id="folderInput" webkitdirectory directory multiple class="hidden" onchange="handleFolder(event)">
-      
+
       <button onclick="document.getElementById('folderInput').click()"
               class="hero-button mx-auto flex items-center gap-x-3 bg-[#0066cc] hover:bg-[#0055aa] text-white px-14 py-6 rounded-3xl text-2xl font-semibold shadow-xl">
         <span class="text-3xl">📁</span>
         <span>Select Folder of Photos</span>
       </button>
-      
+
       <p class="mt-4 text-sm text-gray-500 font-medium">Supports JPG, PNG, HEIC, WebP • Custom target size</p>
     </div>
 
-    <!-- Loading Overlay (cleaner, more professional) -->
     <div id="loadingOverlay" class="hidden fixed inset-0 bg-white/95 backdrop-blur-lg z-50 flex items-center justify-center">
       <div class="w-full max-w-md px-8">
         <div class="mx-auto w-16 h-16 border-4 border-gray-200 border-t-[#0066cc] rounded-full animate-spin mb-8"></div>
-        
-        <p id="loadingTitle" class="text-2xl font-semibold text-gray-800 mb-2">Processing your photos...</p>
+
+        <p id="loadingTitle" class="text-2xl font-semibold text-gray-800 mb-2 loading-pulse">Processing your photos...</p>
         <p id="loadingSubtitle" class="text-gray-600 mb-10">Converting HEIC files • Finding optimal quality</p>
-        
-        <!-- Progress Bar -->
+
         <div class="bg-gray-100 h-2.5 rounded-3xl overflow-hidden mb-3">
           <div id="progressBar" class="progress-bar bg-[#0066cc] h-2.5 rounded-3xl w-0"></div>
         </div>
@@ -97,7 +98,6 @@
       </div>
     </div>
 
-    <!-- Result Section – Premium card with GTS blue/green accents -->
     <div id="result" class="hidden">
       <div class="bg-white border border-gray-100 rounded-3xl shadow-2xl p-14 max-w-2xl mx-auto">
         <div class="flex items-center justify-center gap-x-2 text-emerald-600 font-medium uppercase tracking-widest text-sm mb-4">
@@ -105,10 +105,10 @@
           READY TO DOWNLOAD
           <span class="w-3 h-px bg-emerald-600"></span>
         </div>
-        
+
         <p id="optimalQuality" class="text-8xl font-semibold text-gray-900 tracking-tighter">95%</p>
         <p class="text-xl text-gray-500 mt-1 mb-8">Optimal Quality • New total size</p>
-        
+
         <div class="bg-gray-50 rounded-2xl p-8 mb-12">
           <p id="newTotal" class="text-7xl font-semibold text-emerald-600">12.4 MB</p>
         </div>
@@ -120,14 +120,13 @@
           <span>Download Compressed ZIP</span>
         </button>
 
-        <!-- Restart Button (appears after download) -->
         <button onclick="restartApp()" id="restartBtn"
                 class="hidden mt-6 w-full flex items-center justify-center gap-x-3 bg-gray-800 hover:bg-gray-900 text-white font-semibold py-7 rounded-3xl text-2xl shadow-lg transition-all hero-button">
           <span class="text-3xl">🔄</span>
           <span>Restart — Compress Another Folder</span>
         </button>
       </div>
-      
+
       <p class="mt-10 text-xs text-gray-400">100% processed in your browser • No files leave your device</p>
     </div>
   </div>
@@ -292,7 +291,6 @@
       document.getElementById('loadingTitle').textContent = message;
     }
 
-    // SUPERIOR per-folder search: sample of 20 largest photos only + per-photo live log
     async function findOptimalForGroup(images, targetBytes, folderKey, currentProgress) {
       const origTotal = images.reduce((sum, i) => sum + i.origSize, 0);
       if (origTotal <= targetBytes) return {bestQ: 1.0, bestTotal: origTotal};
@@ -305,7 +303,7 @@
       let low = 0.1, high = 1.0;
       let bestQ = 0.1;
 
-      for (let i = 0; i < 5; i++) {   // only 5 iterations on tiny sample
+      for (let i = 0; i < 5; i++) {
         const mid = (low + high) / 2;
         const sampleTotal = await getGroupTotalSize(sampleImages, mid, folderKey, currentProgress);
         if (sampleTotal <= sampleTarget) {
@@ -317,7 +315,6 @@
         await new Promise(r => setTimeout(r, 0));
       }
 
-      // final exact total on ALL photos (fast parallel, no log)
       const actualTotal = await getGroupTotalSize(images, bestQ, null, currentProgress);
       return {bestQ: Math.max(bestQ, 0.1), bestTotal: actualTotal};
     }
@@ -329,7 +326,6 @@
 
     async function getGroupCompressedBlobs(images, quality, folderKey = null, currentProgress = 50) {
       if (folderKey === null) {
-        // fast parallel (used for final verification)
         return Promise.all(images.map(async item => {
           const canvas = document.createElement('canvas');
           canvas.width = item.img.width;
@@ -340,7 +336,6 @@
         }));
       }
 
-      // sequential with live per-photo log (only during quality search)
       const results = [];
       for (let idx = 0; idx < images.length; idx++) {
         const item = images[idx];
@@ -351,8 +346,10 @@
         const blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', quality));
         results.push({ size: blob.size });
 
-        const percentDone = Math.round(((idx + 1) / images.length) * 100);
-        updateProgress(currentProgress, `Testing quality ${Math.round(quality * 100)}% — Photo ${idx+1}/${images.length} (${percentDone}%) in "${folderKey}"`);
+        updateProgress(
+          currentProgress,
+          `Testing ${item.zipPath.split('/').pop()} • ${Math.round(quality * 100)}% • ${idx + 1}/${images.length}`
+        );
 
         await new Promise(r => setTimeout(r, 0));
       }
@@ -424,10 +421,22 @@
       const targetInput = document.getElementById('targetInput');
       if (targetInput) {
         targetInput.addEventListener('input', () => {
-          targetMB = Math.max(1, parseInt(targetInput.value) || 24);
-          targetInput.value = targetMB;
+          const val = targetInput.value.trim();
+          if (val === '') return;
+
+          const parsed = parseInt(val);
+          if (!isNaN(parsed) && parsed >= 1) {
+            targetMB = parsed;
+          }
+        });
+
+        targetInput.addEventListener('blur', () => {
+          if (targetInput.value.trim() === '') {
+            targetInput.value = targetMB;
+          }
         });
       }
+
       const subsCheckbox = document.getElementById('subsCheckbox');
       if (subsCheckbox) {
         subsCheckbox.addEventListener('change', () => {
