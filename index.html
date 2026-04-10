@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>GTS Photo Compressor — Under 27MB</title>
+  <title>GTS Photo Compressor</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/heic-to@1.4.2/dist/iife/heic-to.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -30,8 +30,8 @@
     }
   </style>
 </head>
-<body class="min-h-screen bg-white">
-  <div class="max-w-5xl mx-auto px-8 py-12 text-center">
+<body class="min-h-screen bg-gray-50">
+  <div class="max-w-2xl mx-auto bg-white rounded-3xl shadow-2xl p-10 text-center border border-gray-100">
     
     <!-- Professional GTS Header / Logo (exactly matching your mockup style) -->
     <div class="gts-header mb-10 flex justify-center">
@@ -53,6 +53,21 @@
       </p>
     </div>
 
+    <!-- Target Size and Subfolders Controls (new) -->
+    <div class="mb-12 flex flex-wrap justify-center items-center gap-x-8 gap-y-6">
+      <div class="flex items-center gap-x-4">
+        <span class="text-xl font-semibold text-gray-700 whitespace-nowrap">Target size</span>
+        <input id="targetInput" type="number" value="24" min="1" step="1" 
+               class="w-28 text-center text-3xl font-bold border-2 border-gray-300 focus:border-[#0066cc] rounded-3xl px-6 py-3 outline-none">
+        <span class="text-3xl font-semibold text-gray-700">MB</span>
+      </div>
+      <div class="flex items-center gap-x-4 bg-gray-50 px-8 py-4 rounded-3xl">
+        <input type="checkbox" id="subsCheckbox" checked 
+               class="w-5 h-5 accent-[#0066cc]">
+        <label for="subsCheckbox" class="text-xl font-medium text-gray-700 cursor-pointer">Compress all sub folders</label>
+      </div>
+    </div>
+
     <!-- Upload Area – Professional blue button exactly like your mockup -->
     <div id="uploadArea" class="mb-20">
       <input type="file" id="folderInput" webkitdirectory directory multiple class="hidden" onchange="handleFolder(event)">
@@ -63,7 +78,7 @@
         <span>Select Folder of Photos</span>
       </button>
       
-      <p class="mt-4 text-sm text-gray-500 font-medium">Supports JPG, PNG, HEIC, WebP • Max 27 MB total</p>
+      <p class="mt-4 text-sm text-gray-500 font-medium">Supports JPG, PNG, HEIC, WebP • Custom target size</p>
     </div>
 
     <!-- Loading Overlay (cleaner, more professional) -->
@@ -120,7 +135,8 @@
   <script>
     let loadedImages = [];
     let optimalQuality = 1.0;
-    let targetMB = 27;
+    let targetMB = 24;
+    let compressAllSubs = true;
 
     function isImageFile(file) {
       const ext = file.name.toLowerCase();
@@ -128,10 +144,18 @@
     }
 
     async function handleFolder(e) {
-      const files = Array.from(e.target.files).filter(isImageFile);
+      let files = Array.from(e.target.files).filter(isImageFile);
       if (files.length === 0) {
         alert("No image files found in the selected folder.");
         return;
+      }
+
+      // NEW: Filter to parent-level only if checkbox is unchecked
+      if (!compressAllSubs) {
+        files = files.filter(file => {
+          const parts = (file.webkitRelativePath || file.name).split('/');
+          return parts.length === 2;
+        });
       }
 
       document.getElementById('uploadArea').classList.add('hidden');
@@ -147,13 +171,12 @@
         updateProgress(percent, `Loading images... (${processed}/${files.length})`);
 
         let blob = file;
-        let displayName = file.name;
+        const originalRelPath = file.webkitRelativePath || file.name;
 
         const isHeic = await HeicTo.isHeic(file).catch(() => false);
         if (isHeic) {
           try {
             blob = await HeicTo({ blob: file, type: 'image/jpeg', quality: 0.98 });
-            displayName = displayName.replace(/\.(heic|heif)$/i, '.jpg');
           } catch (err) {
             console.error(`HEIC failed: ${file.name}`, err);
             continue;
@@ -170,11 +193,23 @@
           continue;
         }
 
+        // NEW: Compute zipPath (preserves folder structure, strips root folder name, forces .jpg)
+        const zipPath = originalRelPath.split('/').slice(1).join('/').replace(/\.\w+$/i, '.jpg');
+
+        // NEW: Compute folderKey for grouping (parent = top-level, otherwise subfolder path)
+        const parts = originalRelPath.split('/');
+        let folderKey = 'parent';
+        if (parts.length > 2) {
+          folderKey = parts.slice(1, -1).join('/');
+        }
+
         loadedImages.push({
-          name: displayName.replace(/\.\w+$/i, '.jpg'),
+          zipPath: zipPath,
           origSize: file.size,
           img: img,
-          preloadUrl: url
+          preloadUrl: url,
+          folderKey: folderKey,
+          quality: 1.0
         });
       }
 
@@ -184,14 +219,93 @@
         return;
       }
 
+      // NEW: Per-folder compression logic (minimal change to original binary-search flow)
       updateProgress(45, "Finding best compression quality...");
-      const targetBytes = targetMB * 1024 * 1024;
+      const totalTargetBytes = targetMB * 1024 * 1024;
       const origTotal = loadedImages.reduce((sum, i) => sum + i.origSize, 0);
 
-      if (origTotal <= targetBytes) {
+      if (origTotal <= totalTargetBytes) {
+        loadedImages.forEach(item => item.quality = 1.0);
         optimalQuality = 1.0;
         showResult(1.0, origTotal);
         return;
+      }
+
+      // Group images by folderKey
+      const groups = new Map();
+      loadedImages.forEach(item => {
+        if (!groups.has(item.folderKey)) {
+          groups.set(item.folderKey, []);
+        }
+        groups.get(item.folderKey).push(item);
+      });
+
+      const numGroups = groups.size;
+      updateProgress(50, `Optimizing ${numGroups} folder${numGroups > 1 ? 's' : ''}...`);
+
+      const initialShare = totalTargetBytes / numGroups;
+      let sumSmall = 0;
+      const needyKeys = [];
+      const groupData = new Map();
+
+      groups.forEach((imgs, key) => {
+        const origT = imgs.reduce((s, i) => s + i.origSize, 0);
+        groupData.set(key, {
+          images: imgs,
+          origTotal: origT,
+          optimalQ: 1.0,
+          compressedTotal: origT
+        });
+        if (origT <= initialShare) {
+          sumSmall += origT;
+        } else {
+          needyKeys.push(key);
+        }
+      });
+
+      const numNeedy = needyKeys.length;
+      if (numNeedy > 0) {
+        const remainingBudget = totalTargetBytes - sumSmall;
+        const perNeedyTarget = remainingBudget / numNeedy;
+        for (let key of needyKeys) {
+          const data = groupData.get(key);
+          const {bestQ, bestTotal} = await findOptimalForGroup(data.images, perNeedyTarget);
+          data.optimalQ = bestQ;
+          data.compressedTotal = bestTotal;
+        }
+      }
+
+      // Assign per-image quality
+      loadedImages.forEach(item => {
+        const data = groupData.get(item.folderKey);
+        if (data) item.quality = data.optimalQ;
+      });
+
+      // Overall totals for display
+      const bestTotal = Array.from(groupData.values()).reduce((sum, d) => sum + d.compressedTotal, 0);
+      let weightedSum = 0;
+      let totalWeight = 0;
+      loadedImages.forEach(item => {
+        weightedSum += (item.quality || 1.0) * item.origSize;
+        totalWeight += item.origSize;
+      });
+      const displayQ = totalWeight > 0 ? weightedSum / totalWeight : 1.0;
+
+      optimalQuality = displayQ;
+      showResult(displayQ, bestTotal);
+    }
+
+    function updateProgress(percent, message) {
+      document.getElementById('progressBar').style.width = percent + '%';
+      document.getElementById('progressText').textContent = percent + '%';
+      document.getElementById('loadingTitle').textContent = message;
+    }
+
+    // NEW helper: per-folder optimal quality (binary search identical to original logic)
+    async function findOptimalForGroup(images, targetBytes) {
+      const origTotal = images.reduce((sum, i) => sum + i.origSize, 0);
+      if (origTotal <= targetBytes) {
+        return {bestQ: 1.0, bestTotal: origTotal};
       }
 
       let low = 0.1, high = 1.0;
@@ -200,10 +314,7 @@
 
       for (let i = 0; i < 12; i++) {
         const mid = (low + high) / 2;
-        const total = await getTotalSize(mid);
-        const progress = 45 + Math.round((i + 1) / 12 * 55);
-        updateProgress(progress, `Testing quality ${Math.round(mid * 100)}%`);
-
+        const total = await getGroupTotalSize(images, mid);
         if (total <= targetBytes) {
           bestQ = mid;
           bestTotal = total;
@@ -213,29 +324,37 @@
         }
       }
 
-      optimalQuality = Math.max(bestQ, 0.1);
-      showResult(optimalQuality, bestTotal);
+      return {bestQ: Math.max(bestQ, 0.1), bestTotal: bestTotal};
     }
 
-    function updateProgress(percent, message) {
-      document.getElementById('progressBar').style.width = percent + '%';
-      document.getElementById('progressText').textContent = percent + '%';
-      document.getElementById('loadingTitle').textContent = message;
-    }
-
-    async function getTotalSize(quality) {
-      const items = await getCompressedBlobs(quality);
+    // NEW helper: size only (used during per-folder search)
+    async function getGroupTotalSize(images, quality) {
+      const items = await getGroupCompressedBlobs(images, quality);
       return items.reduce((sum, i) => sum + i.size, 0);
     }
 
-    async function getCompressedBlobs(quality) {
-      return Promise.all(loadedImages.map(async item => {
+    // NEW helper: canvas compression (size only)
+    async function getGroupCompressedBlobs(images, quality) {
+      return Promise.all(images.map(async item => {
         const canvas = document.createElement('canvas');
         canvas.width = item.img.width;
         canvas.height = item.img.height;
         canvas.getContext('2d').drawImage(item.img, 0, 0);
         const blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', quality));
-        return { name: item.name, blob, size: blob.size };
+        return { size: blob.size };
+      }));
+    }
+
+    // UPDATED: now uses per-image quality + zipPath (preserves folders)
+    async function getCompressedBlobs() {
+      return Promise.all(loadedImages.map(async item => {
+        const canvas = document.createElement('canvas');
+        canvas.width = item.img.width;
+        canvas.height = item.img.height;
+        canvas.getContext('2d').drawImage(item.img, 0, 0);
+        const quality = item.quality || 1.0;
+        const blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', quality));
+        return { zipPath: item.zipPath, blob, size: blob.size };
       }));
     }
 
@@ -257,9 +376,9 @@
       `;
       downloadBtn.disabled = true;
 
-      const items = await getCompressedBlobs(optimalQuality);
+      const items = await getCompressedBlobs();
       const zip = new JSZip();
-      items.forEach(item => zip.file(item.name, item.blob));
+      items.forEach(item => zip.file(item.zipPath, item.blob));
       const zipBlob = await zip.generateAsync({ type: 'blob' });
 
       const url = URL.createObjectURL(zipBlob);
@@ -290,6 +409,23 @@
       document.getElementById('loadingOverlay').classList.add('hidden');
       document.getElementById('result').classList.add('hidden');
     }
+
+    // NEW: live controls (target MB + checkbox)
+    window.addEventListener('load', () => {
+      const targetInput = document.getElementById('targetInput');
+      if (targetInput) {
+        targetInput.addEventListener('input', () => {
+          targetMB = Math.max(1, parseInt(targetInput.value) || 24);
+          targetInput.value = targetMB;
+        });
+      }
+      const subsCheckbox = document.getElementById('subsCheckbox');
+      if (subsCheckbox) {
+        subsCheckbox.addEventListener('change', () => {
+          compressAllSubs = subsCheckbox.checked;
+        });
+      }
+    });
 
     window.addEventListener('beforeunload', () => {
       loadedImages.forEach(item => URL.revokeObjectURL(item.preloadUrl));
