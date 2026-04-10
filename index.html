@@ -150,7 +150,6 @@
         return;
       }
 
-      // NEW: Filter to parent-level only if checkbox is unchecked
       if (!compressAllSubs) {
         files = files.filter(file => {
           const parts = (file.webkitRelativePath || file.name).split('/');
@@ -193,10 +192,8 @@
           continue;
         }
 
-        // NEW: Compute zipPath (preserves folder structure, strips root folder name, forces .jpg)
         const zipPath = originalRelPath.split('/').slice(1).join('/').replace(/\.\w+$/i, '.jpg');
 
-        // NEW: Compute folderKey for grouping (parent = top-level, otherwise subfolder path)
         const parts = originalRelPath.split('/');
         let folderKey = 'parent';
         if (parts.length > 2) {
@@ -219,8 +216,8 @@
         return;
       }
 
-      // NEW: Per-folder compression logic (minimal change to original binary-search flow)
       updateProgress(45, "Finding best compression quality...");
+
       const totalTargetBytes = targetMB * 1024 * 1024;
       const origTotal = loadedImages.reduce((sum, i) => sum + i.origSize, 0);
 
@@ -231,17 +228,14 @@
         return;
       }
 
-      // Group images by folderKey
       const groups = new Map();
       loadedImages.forEach(item => {
-        if (!groups.has(item.folderKey)) {
-          groups.set(item.folderKey, []);
-        }
+        if (!groups.has(item.folderKey)) groups.set(item.folderKey, []);
         groups.get(item.folderKey).push(item);
       });
 
       const numGroups = groups.size;
-      updateProgress(50, `Optimizing ${numGroups} folder${numGroups > 1 ? 's' : ''}...`);
+      updateProgress(48, `Optimizing ${numGroups} folder${numGroups > 1 ? 's' : ''}...`);
 
       const initialShare = totalTargetBytes / numGroups;
       let sumSmall = 0;
@@ -250,12 +244,7 @@
 
       groups.forEach((imgs, key) => {
         const origT = imgs.reduce((s, i) => s + i.origSize, 0);
-        groupData.set(key, {
-          images: imgs,
-          origTotal: origT,
-          optimalQ: 1.0,
-          compressedTotal: origT
-        });
+        groupData.set(key, { images: imgs, origTotal: origT, optimalQ: 1.0, compressedTotal: origT });
         if (origT <= initialShare) {
           sumSmall += origT;
         } else {
@@ -267,24 +256,26 @@
       if (numNeedy > 0) {
         const remainingBudget = totalTargetBytes - sumSmall;
         const perNeedyTarget = remainingBudget / numNeedy;
-        for (let key of needyKeys) {
+
+        for (let i = 0; i < needyKeys.length; i++) {
+          const key = needyKeys[i];
           const data = groupData.get(key);
+          const progress = 50 + Math.round((i + 1) / numNeedy * 45);
+          updateProgress(progress, `Optimizing folder ${i+1} of ${numNeedy}...`);
+
           const {bestQ, bestTotal} = await findOptimalForGroup(data.images, perNeedyTarget);
           data.optimalQ = bestQ;
           data.compressedTotal = bestTotal;
         }
       }
 
-      // Assign per-image quality
       loadedImages.forEach(item => {
         const data = groupData.get(item.folderKey);
         if (data) item.quality = data.optimalQ;
       });
 
-      // Overall totals for display
       const bestTotal = Array.from(groupData.values()).reduce((sum, d) => sum + d.compressedTotal, 0);
-      let weightedSum = 0;
-      let totalWeight = 0;
+      let weightedSum = 0, totalWeight = 0;
       loadedImages.forEach(item => {
         weightedSum += (item.quality || 1.0) * item.origSize;
         totalWeight += item.origSize;
@@ -301,18 +292,15 @@
       document.getElementById('loadingTitle').textContent = message;
     }
 
-    // NEW helper: per-folder optimal quality (binary search identical to original logic)
     async function findOptimalForGroup(images, targetBytes) {
       const origTotal = images.reduce((sum, i) => sum + i.origSize, 0);
-      if (origTotal <= targetBytes) {
-        return {bestQ: 1.0, bestTotal: origTotal};
-      }
+      if (origTotal <= targetBytes) return {bestQ: 1.0, bestTotal: origTotal};
 
       let low = 0.1, high = 1.0;
       let bestQ = 0.1;
       let bestTotal = Infinity;
 
-      for (let i = 0; i < 12; i++) {
+      for (let i = 0; i < 8; i++) {
         const mid = (low + high) / 2;
         const total = await getGroupTotalSize(images, mid);
         if (total <= targetBytes) {
@@ -322,18 +310,17 @@
         } else {
           high = mid;
         }
+        // Yield to browser so progress bar can update and UI stays responsive
+        await new Promise(r => setTimeout(r, 0));
       }
-
-      return {bestQ: Math.max(bestQ, 0.1), bestTotal: bestTotal};
+      return {bestQ: Math.max(bestQ, 0.1), bestTotal};
     }
 
-    // NEW helper: size only (used during per-folder search)
     async function getGroupTotalSize(images, quality) {
       const items = await getGroupCompressedBlobs(images, quality);
       return items.reduce((sum, i) => sum + i.size, 0);
     }
 
-    // NEW helper: canvas compression (size only)
     async function getGroupCompressedBlobs(images, quality) {
       return Promise.all(images.map(async item => {
         const canvas = document.createElement('canvas');
@@ -345,7 +332,6 @@
       }));
     }
 
-    // UPDATED: now uses per-image quality + zipPath (preserves folders)
     async function getCompressedBlobs() {
       return Promise.all(loadedImages.map(async item => {
         const canvas = document.createElement('canvas');
@@ -370,10 +356,7 @@
     async function compressAndDownload() {
       const downloadBtn = document.getElementById('downloadBtn');
       const originalText = downloadBtn.innerHTML;
-      downloadBtn.innerHTML = `
-        <span class="text-3xl">⏳</span>
-        <span>Creating ZIP...</span>
-      `;
+      downloadBtn.innerHTML = `<span class="text-3xl">⏳</span><span>Creating ZIP...</span>`;
       downloadBtn.disabled = true;
 
       const items = await getCompressedBlobs();
@@ -410,7 +393,6 @@
       document.getElementById('result').classList.add('hidden');
     }
 
-    // NEW: live controls (target MB + checkbox)
     window.addEventListener('load', () => {
       const targetInput = document.getElementById('targetInput');
       if (targetInput) {
