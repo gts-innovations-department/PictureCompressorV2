@@ -263,7 +263,7 @@
           const progress = 50 + Math.round((i + 1) / numNeedy * 45);
           updateProgress(progress, `Optimizing folder ${i+1} of ${numNeedy}...`);
 
-          const {bestQ, bestTotal} = await findOptimalForGroup(data.images, perNeedyTarget);
+          const {bestQ, bestTotal} = await findOptimalForGroup(data.images, perNeedyTarget, key, progress);
           data.optimalQ = bestQ;
           data.compressedTotal = bestTotal;
         }
@@ -292,44 +292,71 @@
       document.getElementById('loadingTitle').textContent = message;
     }
 
-    async function findOptimalForGroup(images, targetBytes) {
+    // SUPERIOR per-folder search: sample of 20 largest photos only + per-photo live log
+    async function findOptimalForGroup(images, targetBytes, folderKey, currentProgress) {
       const origTotal = images.reduce((sum, i) => sum + i.origSize, 0);
       if (origTotal <= targetBytes) return {bestQ: 1.0, bestTotal: origTotal};
 
+      const sampleSize = Math.min(20, images.length);
+      const sampleImages = [...images].sort((a, b) => b.origSize - a.origSize).slice(0, sampleSize);
+      const sampleOrig = sampleImages.reduce((s, i) => s + i.origSize, 0);
+      const sampleTarget = targetBytes * (sampleOrig / origTotal);
+
       let low = 0.1, high = 1.0;
       let bestQ = 0.1;
-      let bestTotal = Infinity;
 
-      for (let i = 0; i < 8; i++) {
+      for (let i = 0; i < 5; i++) {   // only 5 iterations on tiny sample
         const mid = (low + high) / 2;
-        const total = await getGroupTotalSize(images, mid);
-        if (total <= targetBytes) {
+        const sampleTotal = await getGroupTotalSize(sampleImages, mid, folderKey, currentProgress);
+        if (sampleTotal <= sampleTarget) {
           bestQ = mid;
-          bestTotal = total;
           low = mid;
         } else {
           high = mid;
         }
-        // Yield to browser so progress bar can update and UI stays responsive
         await new Promise(r => setTimeout(r, 0));
       }
-      return {bestQ: Math.max(bestQ, 0.1), bestTotal};
+
+      // final exact total on ALL photos (fast parallel, no log)
+      const actualTotal = await getGroupTotalSize(images, bestQ, null, currentProgress);
+      return {bestQ: Math.max(bestQ, 0.1), bestTotal: actualTotal};
     }
 
-    async function getGroupTotalSize(images, quality) {
-      const items = await getGroupCompressedBlobs(images, quality);
+    async function getGroupTotalSize(images, quality, folderKey = null, currentProgress = 50) {
+      const items = await getGroupCompressedBlobs(images, quality, folderKey, currentProgress);
       return items.reduce((sum, i) => sum + i.size, 0);
     }
 
-    async function getGroupCompressedBlobs(images, quality) {
-      return Promise.all(images.map(async item => {
+    async function getGroupCompressedBlobs(images, quality, folderKey = null, currentProgress = 50) {
+      if (folderKey === null) {
+        // fast parallel (used for final verification)
+        return Promise.all(images.map(async item => {
+          const canvas = document.createElement('canvas');
+          canvas.width = item.img.width;
+          canvas.height = item.img.height;
+          canvas.getContext('2d').drawImage(item.img, 0, 0);
+          const blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', quality));
+          return { size: blob.size };
+        }));
+      }
+
+      // sequential with live per-photo log (only during quality search)
+      const results = [];
+      for (let idx = 0; idx < images.length; idx++) {
+        const item = images[idx];
         const canvas = document.createElement('canvas');
         canvas.width = item.img.width;
         canvas.height = item.img.height;
         canvas.getContext('2d').drawImage(item.img, 0, 0);
         const blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', quality));
-        return { size: blob.size };
-      }));
+        results.push({ size: blob.size });
+
+        const percentDone = Math.round(((idx + 1) / images.length) * 100);
+        updateProgress(currentProgress, `Testing quality ${Math.round(quality * 100)}% — Photo ${idx+1}/${images.length} (${percentDone}%) in "${folderKey}"`);
+
+        await new Promise(r => setTimeout(r, 0));
+      }
+      return results;
     }
 
     async function getCompressedBlobs() {
