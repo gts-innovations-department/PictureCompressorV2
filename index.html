@@ -67,7 +67,8 @@ h1 {
 .subtitle,
 .helper,
 .progress-label,
-.summary {
+.summary,
+.target-note {
     color: var(--muted);
 }
 
@@ -104,7 +105,8 @@ input[type="file"] {
 .actions {
     display: flex;
     flex-wrap: wrap;
-    gap: 10px;
+    align-items: center;
+    gap: 14px;
     margin-bottom: 10px;
 }
 
@@ -114,7 +116,7 @@ button {
     background: linear-gradient(180deg, var(--primary-2), var(--primary));
     color: white;
     font-weight: 700;
-    padding: 12px 16px;
+    padding: 12px 18px;
     cursor: pointer;
     transition: transform 0.15s ease, opacity 0.15s ease;
 }
@@ -126,6 +128,10 @@ button:hover:not(:disabled) {
 button:disabled {
     opacity: 0.5;
     cursor: not-allowed;
+}
+
+.target-note {
+    font-size: 0.95rem;
 }
 
 .progress {
@@ -196,6 +202,11 @@ code {
         width: 60px;
         height: 60px;
     }
+
+    .actions {
+        align-items: flex-start;
+        flex-direction: column;
+    }
 }
 </style>
 </head>
@@ -205,7 +216,7 @@ code {
         <img class="logo" src="GTSLOGOV1.png" alt="GTS logo">
         <div>
             <h1>GTS Picture Compressor</h1>
-            <p class="subtitle">Compress JPG, PNG, WEBP, HEIC, and HEIF images directly in your browser, then download everything as a ZIP. Nothing gets uploaded to a server.</p>
+            <p class="subtitle">Compress JPG, PNG, WEBP, HEIC, and HEIF images directly in your browser, then download everything as a ZIP. The app now auto-targets a total ZIP size under 20 MB when possible.</p>
         </div>
     </div>
 
@@ -221,9 +232,8 @@ code {
     </div>
 
     <div class="actions">
-        <button data-target="512">Compress to 512 KB</button>
-        <button data-target="300">Compress to 300 KB</button>
-        <button data-target="70">Compress to 70 KB</button>
+        <button id="startButton">Smart Compress for 20 MB</button>
+        <div class="target-note">One automatic shrink ratio is calculated from the full batch instead of using manual per-file size buttons.</div>
     </div>
 
     <div class="progress"><div class="bar" id="bar"></div></div>
@@ -233,12 +243,15 @@ code {
     </div>
     <div class="summary" id="summary"></div>
 
-    <pre id="log">Ready. Pick files or a folder, then choose a target size.</pre>
+    <pre id="log">Ready. Pick files or a folder, then click Smart Compress for 20 MB.</pre>
 
-    <p class="helper">Tip: if a picture is already smaller than the target, it stays as-is unless it needs HEIC conversion for browser compatibility.</p>
+    <p class="helper">Tip: the app estimates how aggressively the full batch needs to shrink to stay under 20 MB. If the selected files are already under that limit, it keeps quality high and only recompresses when needed.</p>
 </div>
 
 <script>
+const TARGET_TOTAL_MB = 20;
+const TARGET_TOTAL_BYTES = TARGET_TOTAL_MB * 1024 * 1024;
+const MIN_FILE_TARGET_BYTES = 64 * 1024;
 const log = document.getElementById("log");
 const bar = document.getElementById("bar");
 const progressLabel = document.getElementById("progressLabel");
@@ -246,7 +259,7 @@ const countLabel = document.getElementById("countLabel");
 const summary = document.getElementById("summary");
 const fileInput = document.getElementById("fileInput");
 const folderInput = document.getElementById("folderInput");
-const buttons = Array.from(document.querySelectorAll("button[data-target]"));
+const startButton = document.getElementById("startButton");
 
 function write(text = "") {
     log.textContent += `${text}\n`;
@@ -257,8 +270,16 @@ function resetLog() {
     log.textContent = "";
 }
 
+function clamp(value, min, max) {
+    return Math.min(max, Math.max(min, value));
+}
+
 function formatKB(bytes) {
     return `${(bytes / 1024).toFixed(1)} KB`;
+}
+
+function formatMB(bytes) {
+    return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
 }
 
 function isHeic(file) {
@@ -288,6 +309,19 @@ function getSelectedImages() {
     return uniqueFiles(combined).filter(isSupportedImage);
 }
 
+function getBatchRatio(totalOriginalBytes) {
+    if (!totalOriginalBytes) return 1;
+    return Math.min(1, TARGET_TOTAL_BYTES / totalOriginalBytes);
+}
+
+function getTargetBytesForFile(file, batchRatio, totalOriginalBytes) {
+    if (totalOriginalBytes <= TARGET_TOTAL_BYTES) {
+        return file.size;
+    }
+
+    return Math.max(MIN_FILE_TARGET_BYTES, Math.floor(file.size * batchRatio));
+}
+
 async function convertHeicToJpeg(file) {
     write(`CONVERTING: ${file.name}`);
     const convertedBlob = await heic2any({
@@ -303,36 +337,67 @@ async function convertHeicToJpeg(file) {
     );
 }
 
-async function convertAndCompress(file, maxKB) {
+async function compressToTarget(file, targetBytes, batchRatio) {
+    let outputFile = file;
+    let changed = false;
+
+    if (outputFile.size <= targetBytes) {
+        return { file: outputFile, changed };
+    }
+
+    const passes = [
+        {
+            maxSizeMB: Math.max(targetBytes / (1024 * 1024), 0.04),
+            initialQuality: clamp(batchRatio * 1.05, 0.35, 0.92),
+            maxWidthOrHeight: batchRatio < 0.45 ? 2600 : batchRatio < 0.7 ? 3400 : 4600
+        },
+        {
+            maxSizeMB: Math.max(targetBytes / (1024 * 1024), 0.04),
+            initialQuality: clamp(batchRatio * 0.82, 0.22, 0.82),
+            maxWidthOrHeight: batchRatio < 0.45 ? 2000 : batchRatio < 0.7 ? 2800 : 3800
+        }
+    ];
+
+    for (const pass of passes) {
+        if (outputFile.size <= targetBytes) {
+            break;
+        }
+
+        outputFile = await imageCompression(outputFile, {
+            maxSizeMB: pass.maxSizeMB,
+            maxWidthOrHeight: pass.maxWidthOrHeight,
+            useWebWorker: true,
+            initialQuality: pass.initialQuality,
+            alwaysKeepResolution: false,
+            maxIteration: 15
+        });
+
+        changed = true;
+    }
+
+    return { file: outputFile, changed };
+}
+
+async function convertAndCompress(file, targetBytes, batchRatio) {
     let workingFile = file;
+    let changed = false;
 
     if (isHeic(file)) {
         workingFile = await convertHeicToJpeg(file);
+        changed = true;
     }
 
-    if (!isHeic(file) && workingFile.size <= maxKB * 1024) {
-        return { file: workingFile, changed: false };
-    }
-
-    const compressed = await imageCompression(workingFile, {
-        maxSizeMB: maxKB / 1024,
-        maxWidthOrHeight: 8192,
-        useWebWorker: true,
-        initialQuality: 0.92,
-        alwaysKeepResolution: true,
-        maxIteration: 12
-    });
-
-    return { file: compressed, changed: true };
+    const compressed = await compressToTarget(workingFile, targetBytes, batchRatio);
+    return { file: compressed.file, changed: changed || compressed.changed };
 }
 
 function setBusy(busy) {
-    buttons.forEach(button => button.disabled = busy);
+    startButton.disabled = busy;
     fileInput.disabled = busy;
     folderInput.disabled = busy;
 }
 
-async function start(maxKB) {
+async function start() {
     const images = getSelectedImages();
 
     if (!images.length) {
@@ -344,33 +409,42 @@ async function start(maxKB) {
     resetLog();
     bar.style.width = "0%";
     bar.style.background = "linear-gradient(90deg, var(--primary), #53b5ff)";
-    progressLabel.textContent = `Compressing to ${maxKB} KB`;
+    progressLabel.textContent = "Analyzing batch";
     countLabel.textContent = `0 / ${images.length}`;
     summary.textContent = "";
 
-    write(`Starting compression to ${maxKB} KB`);
-    write(`Images found: ${images.length}`);
+    const totalOriginalBytes = images.reduce((sum, image) => sum + image.size, 0);
+    const batchRatio = getBatchRatio(totalOriginalBytes);
+    const targetRatioPercent = Math.round(batchRatio * 100);
+
+    write(`Target ZIP size: ${TARGET_TOTAL_MB} MB when possible`);
+    write(`Original batch size: ${formatMB(totalOriginalBytes)}`);
+    write(totalOriginalBytes > TARGET_TOTAL_BYTES
+        ? `Calculated shrink ratio: ${targetRatioPercent}% of original bytes`
+        : "Batch is already under 20 MB, keeping quality as high as possible");
     write("");
 
     const zip = new JSZip();
     let done = 0;
-    let totalOriginal = 0;
-    let totalFinal = 0;
+    let totalFinalBytes = 0;
 
     try {
         for (const image of images) {
-            totalOriginal += image.size;
+            const targetBytes = getTargetBytesForFile(image, batchRatio, totalOriginalBytes);
 
             try {
-                const result = await convertAndCompress(image, maxKB);
+                progressLabel.textContent = `Compressing ${image.name}`;
+                write(`TARGET: ${image.name} -> ${formatKB(targetBytes)}`);
+
+                const result = await convertAndCompress(image, targetBytes, batchRatio);
                 const outputFile = result.file;
-                totalFinal += outputFile.size;
+                totalFinalBytes += outputFile.size;
                 zip.file(outputFile.name, outputFile);
 
                 done += 1;
                 bar.style.width = `${Math.round((done / images.length) * 100)}%`;
                 countLabel.textContent = `${done} / ${images.length}`;
-                write(`${result.changed ? "DONE" : "SKIPPED"}: ${outputFile.name} (${formatKB(image.size)} → ${formatKB(outputFile.size)})`);
+                write(`${result.changed ? "DONE" : "KEPT"}: ${outputFile.name} (${formatKB(image.size)} → ${formatKB(outputFile.size)})`);
             } catch (error) {
                 done += 1;
                 bar.style.width = `${Math.round((done / images.length) * 100)}%`;
@@ -388,7 +462,7 @@ async function start(maxKB) {
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
-        a.download = `compressed-images-${maxKB}kb.zip`;
+        a.download = "compressed-images-under-20mb.zip";
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
@@ -396,17 +470,17 @@ async function start(maxKB) {
 
         bar.style.background = "linear-gradient(90deg, #27c46b, var(--success))";
         progressLabel.textContent = "Finished";
-        summary.textContent = `Original total: ${formatKB(totalOriginal)} | Output total: ${formatKB(totalFinal)} | Saved: ${formatKB(Math.max(totalOriginal - totalFinal, 0))}`;
+        summary.textContent = `Original total: ${formatMB(totalOriginalBytes)} | Output total: ${formatMB(totalFinalBytes)} | Saved: ${formatMB(Math.max(totalOriginalBytes - totalFinalBytes, 0))}`;
         write("");
-        write("✅ Finished");
+        write(totalFinalBytes <= TARGET_TOTAL_BYTES
+            ? `✅ Finished under ${TARGET_TOTAL_MB} MB`
+            : `✅ Finished, but browser-side compression could not get this batch below ${TARGET_TOTAL_MB} MB without more aggressive quality loss`);
     } finally {
         setBusy(false);
     }
 }
 
-buttons.forEach(button => {
-    button.addEventListener("click", () => start(Number(button.dataset.target)));
-});
+startButton.addEventListener("click", start);
 </script>
 </body>
 </html>
