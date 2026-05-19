@@ -1,9 +1,18 @@
 # GTS Picture Compressor
 
-This app can run two ways:
+This app can run three ways:
 
-1. **Online** via GitHub Pages
-2. **Locally with no domain required**
+1. **Online** via Netlify
+2. **Online** via GitHub Pages
+3. **Locally with no domain required**
+
+## Recommended web hosting
+
+Use Netlify and point it at this repo.
+
+- Build command: leave blank
+- Publish directory: `.`
+- The included `netlify.toml` already tells Netlify to publish the repo root
 
 ## Recommended if web filters block the site
 
