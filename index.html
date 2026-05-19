@@ -4,9 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>GTS Picture Compressor</title>
-<script src="https://cdn.jsdelivr.net/npm/browser-image-compression@2.0.2/dist/browser-image-compression.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@zip.js/zip.js@2.7.57/dist/zip-full.min.js"></script>
+<script src="./vendor/browser-image-compression.js"></script>
+<script src="./vendor/heic2any.min.js"></script>
+<script src="./vendor/zip-full.min.js"></script>
 <style>
 :root {
     color-scheme: dark;
@@ -239,7 +239,7 @@ pre {
         <img class="logo" src="GTSLOGOV1.png" alt="GTS logo">
         <div>
             <h1>GTS Picture Compressor</h1>
-            <p class="subtitle">Compress JPG, PNG, WEBP, HEIC, and HEIF images directly in your browser, then download a ZIP. The app now always aims for about 100 KB per image, processes files one at a time, and uses streaming ZIP writes when the browser supports it.</p>
+            <p class="subtitle">Compress JPG, PNG, WEBP, HEIC, and HEIF images directly in your browser, then download a ZIP. The app now always aims for about 100 KB per image, processes files one at a time, uses streaming ZIP writes when the browser supports it, and can run locally without GitHub Pages.</p>
         </div>
     </div>
 
@@ -283,7 +283,7 @@ pre {
 
     <pre id="log">Ready. Pick files or a folder, then click Compress to 100 KB per image.</pre>
 
-    <p class="helper">Tip: on Chrome or Edge, the ZIP can stream straight to disk, which helps a lot with 200-picture batches. On browsers without direct file-save streaming, this still processes sequentially to reduce freezes, but huge batches may use more memory during the final download step.</p>
+    <p class="helper">Tip: you can now run this app locally by downloading the repo ZIP, extracting it, and opening <strong>index.html</strong>. On Chrome or Edge, the ZIP can stream straight to disk, which helps a lot with 200-picture batches. On browsers without direct file-save streaming, this still processes sequentially to reduce freezes, but huge batches may use more memory during the final download step.</p>
 </div>
 
 <script>
