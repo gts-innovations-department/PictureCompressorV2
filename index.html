@@ -6,7 +6,7 @@
 <title>GTS Picture Compressor</title>
 <script src="./vendor/browser-image-compression.js"></script>
 <script src="./vendor/heic2any.min.js"></script>
-<script src="./vendor/zip-full.min.js"></script>
+<script src="./vendor/jszip.min.js"></script>
 <style>
 :root {
     color-scheme: dark;
@@ -239,7 +239,7 @@ pre {
         <img class="logo" src="GTSLOGOV1.png" alt="GTS logo">
         <div>
             <h1>GTS Picture Compressor</h1>
-            <p class="subtitle">Compress JPG, PNG, WEBP, HEIC, and HEIF images directly in your browser, then download a ZIP. The app now always aims for about 100 KB per image, processes files one at a time, uses streaming ZIP writes when the browser supports it, and can run locally without GitHub Pages.</p>
+            <p class="subtitle">Compress JPG, PNG, WEBP, HEIC, and HEIF images directly in your browser, then download a ZIP. This version keeps the browser behavior simple and always targets about 100 KB per image.</p>
         </div>
     </div>
 
@@ -264,14 +264,14 @@ pre {
             <div class="stat-value">Convert to JPG first</div>
         </div>
         <div class="stat-card">
-            <div class="stat-label">Large batches</div>
-            <div class="stat-value">One file at a time</div>
+            <div class="stat-label">Browser mode</div>
+            <div class="stat-value">Simple ZIP download</div>
         </div>
     </div>
 
     <div class="actions">
         <button id="startButton">Compress to 100 KB per image</button>
-        <div class="target-note">HEIC files are converted to JPEG one at a time before compression. For large batches, the app avoids holding all processed images in memory at once.</div>
+        <div class="target-note">Files are processed one at a time. HEIC and HEIF files are converted to JPG first, then compressed, then added to a normal ZIP download.</div>
     </div>
 
     <div class="progress"><div class="bar" id="bar"></div></div>
@@ -283,7 +283,7 @@ pre {
 
     <pre id="log">Ready. Pick files or a folder, then click Compress to 100 KB per image.</pre>
 
-    <p class="helper">Tip: you can now run this app locally by downloading the repo ZIP, extracting it, and opening <strong>index.html</strong>. On Chrome or Edge, the ZIP can stream straight to disk, which helps a lot with 200-picture batches. On browsers without direct file-save streaming, this still processes sequentially to reduce freezes, but huge batches may use more memory during the final download step.</p>
+    <p class="helper">Tip: this build avoids advanced browser file-system APIs. Large batches are still processed sequentially to reduce freezes, but if a browser struggles with a huge job, split it into smaller batches like 50 to 100 pictures.</p>
 </div>
 
 <script>
@@ -358,33 +358,29 @@ function getOutputPath(sourceFile, outputFile) {
 }
 
 function estimateRatio(fileSize) {
-    return clamp(TARGET_IMAGE_BYTES / Math.max(fileSize, TARGET_IMAGE_BYTES), 0.06, 1);
+    return clamp(TARGET_IMAGE_BYTES / Math.max(fileSize, TARGET_IMAGE_BYTES), 0.08, 1);
 }
 
 function getCompressionPasses(file, sourceWasHeic) {
     const ratio = estimateRatio(file.size);
-    const veryLarge = file.size > 8 * 1024 * 1024;
-    const large = file.size > 3 * 1024 * 1024;
-
-    const firstWidth = sourceWasHeic ? 2400 : veryLarge ? 2800 : large ? 3200 : 4200;
-    const secondWidth = sourceWasHeic ? 1800 : veryLarge ? 2200 : large ? 2600 : 3200;
-    const thirdWidth = sourceWasHeic ? 1500 : 1900;
+    const huge = file.size > 10 * 1024 * 1024;
+    const large = file.size > 4 * 1024 * 1024;
 
     return [
         {
             maxSizeMB: TARGET_IMAGE_BYTES / (1024 * 1024),
-            initialQuality: sourceWasHeic ? clamp(ratio * 1.15, 0.44, 0.8) : clamp(ratio * 1.28, 0.45, 0.9),
-            maxWidthOrHeight: firstWidth
+            initialQuality: sourceWasHeic ? clamp(ratio * 1.1, 0.4, 0.78) : clamp(ratio * 1.25, 0.42, 0.9),
+            maxWidthOrHeight: sourceWasHeic ? 2400 : huge ? 2800 : large ? 3200 : 4200
         },
         {
             maxSizeMB: TARGET_IMAGE_BYTES / (1024 * 1024),
-            initialQuality: sourceWasHeic ? clamp(ratio * 0.9, 0.28, 0.68) : clamp(ratio * 0.94, 0.3, 0.78),
-            maxWidthOrHeight: secondWidth
+            initialQuality: sourceWasHeic ? clamp(ratio * 0.88, 0.26, 0.66) : clamp(ratio * 0.95, 0.28, 0.76),
+            maxWidthOrHeight: sourceWasHeic ? 1800 : huge ? 2200 : large ? 2600 : 3200
         },
         {
             maxSizeMB: TARGET_IMAGE_BYTES / (1024 * 1024),
-            initialQuality: sourceWasHeic ? 0.24 : 0.28,
-            maxWidthOrHeight: thirdWidth
+            initialQuality: sourceWasHeic ? 0.22 : 0.26,
+            maxWidthOrHeight: sourceWasHeic ? 1500 : 1900
         }
     ];
 }
@@ -465,47 +461,6 @@ async function convertAndCompress(file) {
     };
 }
 
-async function createZipTarget() {
-    if ("showSaveFilePicker" in window) {
-        try {
-            const fileHandle = await window.showSaveFilePicker({
-                suggestedName: ZIP_FILENAME,
-                types: [{
-                    description: "ZIP archive",
-                    accept: { "application/zip": [".zip"] }
-                }]
-            });
-
-            const writable = await fileHandle.createWritable();
-            const writer = new zip.ZipWriter(writable);
-            return {
-                mode: "disk",
-                writer,
-                finalize: async () => {
-                    await writer.close();
-                    return { mode: "disk" };
-                }
-            };
-        } catch (error) {
-            if (error && error.name === "AbortError") {
-                throw error;
-            }
-            write("Direct disk save unavailable, falling back to browser download mode.");
-        }
-    }
-
-    const blobWriter = new zip.BlobWriter("application/zip");
-    const writer = new zip.ZipWriter(blobWriter);
-    return {
-        mode: "memory",
-        writer,
-        finalize: async () => {
-            const blob = await writer.close();
-            return { mode: "memory", blob };
-        }
-    };
-}
-
 function setBusy(busy) {
     startButton.disabled = busy;
     fileInput.disabled = busy;
@@ -531,16 +486,6 @@ async function start() {
         return;
     }
 
-    let zipTarget;
-    try {
-        zipTarget = await createZipTarget();
-    } catch (error) {
-        if (error && error.name === "AbortError") {
-            return;
-        }
-        throw error;
-    }
-
     setBusy(true);
     resetLog();
     bar.style.width = "0%";
@@ -556,12 +501,10 @@ async function start() {
     write(`Images found: ${images.length}`);
     write(`Original total: ${formatMB(totalOriginalBytes)}`);
     write(`HEIC / HEIF files: ${heicCount}`);
-    write(`ZIP output mode: ${zipTarget.mode === "disk" ? "streaming to disk" : "browser download"}`);
-    if (zipTarget.mode === "memory" && images.length >= 150) {
-        write("WARNING: very large batch detected. Chrome or Edge will be more stable because they support direct streaming ZIP saves.");
-    }
+    write("ZIP output mode: standard browser download");
     write("");
 
+    const zip = new JSZip();
     let done = 0;
     let totalFinalBytes = 0;
     let errorCount = 0;
@@ -576,8 +519,8 @@ async function start() {
                 const outputFile = result.file;
                 const outputPath = getOutputPath(image, outputFile);
                 totalFinalBytes += outputFile.size;
+                zip.file(outputPath, outputFile);
 
-                await zipTarget.writer.add(outputPath, new zip.BlobReader(outputFile), { level: 0 });
                 done += 1;
                 bar.style.width = `${Math.round((done / images.length) * 100)}%`;
                 countLabel.textContent = `${done} / ${images.length}`;
@@ -597,23 +540,33 @@ async function start() {
             await yieldToBrowser();
         }
 
-        progressLabel.textContent = "Finalizing ZIP";
+        progressLabel.textContent = "Creating ZIP";
         write("");
-        write("Finalizing ZIP...");
+        write("Creating ZIP...");
 
-        const finalized = await zipTarget.finalize();
-        if (finalized.mode === "memory") {
-            downloadBlob(finalized.blob, ZIP_FILENAME);
-        }
+        const blob = await zip.generateAsync(
+            { type: "blob", compression: "DEFLATE", compressionOptions: { level: 4 } },
+            metadata => {
+                if (metadata.percent != null) {
+                    progressLabel.textContent = `Creating ZIP ${Math.round(metadata.percent)}%`;
+                }
+            }
+        );
+
+        downloadBlob(blob, ZIP_FILENAME);
 
         bar.style.background = "linear-gradient(90deg, #27c46b, var(--success))";
         progressLabel.textContent = "Finished";
 
-        const avgBytes = done - errorCount > 0 ? totalFinalBytes / (done - errorCount) : 0;
+        const processedCount = Math.max(done - errorCount, 0);
+        const avgBytes = processedCount ? totalFinalBytes / processedCount : 0;
         summary.innerHTML = `Original total: ${formatMB(totalOriginalBytes)} | Output total: ${formatMB(totalFinalBytes)} | Average image: ${formatKB(avgBytes)}${errorCount ? ` | <span class="warn">Errors: ${errorCount}</span>` : ""}`;
 
         write("");
         write(`✅ Finished. Average output image size: ${formatKB(avgBytes)}.`);
+        if (processedCount >= 150) {
+            write("Large batch completed. If browser performance feels rough, try splitting future jobs into smaller batches.");
+        }
         if (avgBytes > TARGET_IMAGE_BYTES * 1.2) {
             write("Some files needed to stay above 100 KB to avoid extreme quality loss or because the browser hit format limits.");
         }
