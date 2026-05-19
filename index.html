@@ -3,29 +3,20 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>GTS Photo Compressor</title>
+  <title>GTS Photo Compressor — Under 27MB</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/heic-to@1.4.2/dist/iife/heic-to.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 
   <style>
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    body { 
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
     }
     canvas { display: none; }
     .progress-bar {
       transition: width 0.4s ease-in-out;
     }
-
-    .loading-pulse {
-      animation: pulseText 1s infinite;
-    }
-
-    @keyframes pulseText {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.35; }
-    }
-
+    
     /* Professional GTS-inspired styling */
     .gts-header {
       background: linear-gradient(to bottom, #f8fafc, #ffffff);
@@ -39,58 +30,51 @@
     }
   </style>
 </head>
-<body class="min-h-screen bg-gray-50 flex items-center justify-center py-10">
-  <div class="max-w-2xl mx-auto bg-white rounded-3xl shadow-2xl p-10 text-center border border-gray-100">
-
+<body class="min-h-screen bg-white">
+  <div class="max-w-5xl mx-auto px-8 py-12 text-center">
+    
+    <!-- Professional GTS Header / Logo (exactly matching your mockup style) -->
     <div class="gts-header mb-10 flex justify-center">
       <div class="text-center">
-        <img src="GTSLOGOV1.png"
-             alt="Gibson Technical Services"
+        <img src="GTSLOGOV1.png" 
+             alt="Gibson Technical Services" 
              class="h-28 mx-auto mb-3 drop-shadow-sm">
         <p class="text-xs tracking-[2px] font-medium text-gray-500">Photo Compressor</p>
       </div>
     </div>
 
+    <!-- Hero Title & Subtitle (clean, corporate, matches mockup) -->
     <div class="mb-16">
-      <h1 class="text-6xl font-semibold tracking-[-1px] text-gray-900 leading-none"></h1>
+      <h1 class="text-6xl font-semibold tracking-[-1px] text-gray-900 leading-none">
+        
+      </h1>
       <p class="mt-5 text-2xl text-gray-600 max-w-2xl mx-auto leading-tight">
         Compress your photos to stay under any target size — 100% private &amp; in-browser
       </p>
     </div>
 
-    <div class="mb-12 flex flex-wrap justify-center items-center gap-x-8 gap-y-6">
-      <div class="flex items-center gap-x-4">
-        <span class="text-xl font-semibold text-gray-700 whitespace-nowrap">Target size</span>
-        <input id="targetInput" type="number" value="24" min="1" step="1"
-               class="w-40 text-center text-3xl font-bold border-2 border-gray-300 focus:border-[#0066cc] rounded-3xl px-6 py-3 outline-none">
-        <span class="text-3xl font-semibold text-gray-700">MB</span>
-      </div>
-      <div class="flex items-center gap-x-4 bg-gray-50 px-8 py-4 rounded-3xl">
-        <input type="checkbox" id="subsCheckbox" checked
-               class="w-5 h-5 accent-[#0066cc]">
-        <label for="subsCheckbox" class="text-xl font-medium text-gray-700 cursor-pointer">Compress all sub folders</label>
-      </div>
-    </div>
-
+    <!-- Upload Area – Professional blue button exactly like your mockup -->
     <div id="uploadArea" class="mb-20">
       <input type="file" id="folderInput" webkitdirectory directory multiple class="hidden" onchange="handleFolder(event)">
-
+      
       <button onclick="document.getElementById('folderInput').click()"
               class="hero-button mx-auto flex items-center gap-x-3 bg-[#0066cc] hover:bg-[#0055aa] text-white px-14 py-6 rounded-3xl text-2xl font-semibold shadow-xl">
         <span class="text-3xl">📁</span>
         <span>Select Folder of Photos</span>
       </button>
-
-      <p class="mt-4 text-sm text-gray-500 font-medium">Supports JPG, PNG, HEIC, WebP • Custom target size</p>
+      
+      <p class="mt-4 text-sm text-gray-500 font-medium">Supports JPG, PNG, HEIC, WebP • Max 27 MB total</p>
     </div>
 
+    <!-- Loading Overlay (cleaner, more professional) -->
     <div id="loadingOverlay" class="hidden fixed inset-0 bg-white/95 backdrop-blur-lg z-50 flex items-center justify-center">
       <div class="w-full max-w-md px-8">
         <div class="mx-auto w-16 h-16 border-4 border-gray-200 border-t-[#0066cc] rounded-full animate-spin mb-8"></div>
-
-        <p id="loadingTitle" class="text-2xl font-semibold text-gray-800 mb-2 loading-pulse">Processing your photos...</p>
+        
+        <p id="loadingTitle" class="text-2xl font-semibold text-gray-800 mb-2">Processing your photos...</p>
         <p id="loadingSubtitle" class="text-gray-600 mb-10">Converting HEIC files • Finding optimal quality</p>
-
+        
+        <!-- Progress Bar -->
         <div class="bg-gray-100 h-2.5 rounded-3xl overflow-hidden mb-3">
           <div id="progressBar" class="progress-bar bg-[#0066cc] h-2.5 rounded-3xl w-0"></div>
         </div>
@@ -98,6 +82,7 @@
       </div>
     </div>
 
+    <!-- Result Section – Premium card with GTS blue/green accents -->
     <div id="result" class="hidden">
       <div class="bg-white border border-gray-100 rounded-3xl shadow-2xl p-14 max-w-2xl mx-auto">
         <div class="flex items-center justify-center gap-x-2 text-emerald-600 font-medium uppercase tracking-widest text-sm mb-4">
@@ -105,10 +90,10 @@
           READY TO DOWNLOAD
           <span class="w-3 h-px bg-emerald-600"></span>
         </div>
-
+        
         <p id="optimalQuality" class="text-8xl font-semibold text-gray-900 tracking-tighter">95%</p>
         <p class="text-xl text-gray-500 mt-1 mb-8">Optimal Quality • New total size</p>
-
+        
         <div class="bg-gray-50 rounded-2xl p-8 mb-12">
           <p id="newTotal" class="text-7xl font-semibold text-emerald-600">12.4 MB</p>
         </div>
@@ -120,13 +105,14 @@
           <span>Download Compressed ZIP</span>
         </button>
 
+        <!-- Restart Button (appears after download) -->
         <button onclick="restartApp()" id="restartBtn"
                 class="hidden mt-6 w-full flex items-center justify-center gap-x-3 bg-gray-800 hover:bg-gray-900 text-white font-semibold py-7 rounded-3xl text-2xl shadow-lg transition-all hero-button">
           <span class="text-3xl">🔄</span>
           <span>Restart — Compress Another Folder</span>
         </button>
       </div>
-
+      
       <p class="mt-10 text-xs text-gray-400">100% processed in your browser • No files leave your device</p>
     </div>
   </div>
@@ -134,8 +120,7 @@
   <script>
     let loadedImages = [];
     let optimalQuality = 1.0;
-    let targetMB = 24;
-    let compressAllSubs = true;
+    let targetMB = 27;
 
     function isImageFile(file) {
       const ext = file.name.toLowerCase();
@@ -143,17 +128,10 @@
     }
 
     async function handleFolder(e) {
-      let files = Array.from(e.target.files).filter(isImageFile);
+      const files = Array.from(e.target.files).filter(isImageFile);
       if (files.length === 0) {
         alert("No image files found in the selected folder.");
         return;
-      }
-
-      if (!compressAllSubs) {
-        files = files.filter(file => {
-          const parts = (file.webkitRelativePath || file.name).split('/');
-          return parts.length === 2;
-        });
       }
 
       document.getElementById('uploadArea').classList.add('hidden');
@@ -169,12 +147,13 @@
         updateProgress(percent, `Loading images... (${processed}/${files.length})`);
 
         let blob = file;
-        const originalRelPath = file.webkitRelativePath || file.name;
+        let displayName = file.name;
 
         const isHeic = await HeicTo.isHeic(file).catch(() => false);
         if (isHeic) {
           try {
             blob = await HeicTo({ blob: file, type: 'image/jpeg', quality: 0.98 });
+            displayName = displayName.replace(/\.(heic|heif)$/i, '.jpg');
           } catch (err) {
             console.error(`HEIC failed: ${file.name}`, err);
             continue;
@@ -191,21 +170,11 @@
           continue;
         }
 
-        const zipPath = originalRelPath.split('/').slice(1).join('/').replace(/\.\w+$/i, '.jpg');
-
-        const parts = originalRelPath.split('/');
-        let folderKey = 'parent';
-        if (parts.length > 2) {
-          folderKey = parts.slice(1, -1).join('/');
-        }
-
         loadedImages.push({
-          zipPath: zipPath,
+          name: displayName.replace(/\.\w+$/i, '.jpg'),
           origSize: file.size,
           img: img,
-          preloadUrl: url,
-          folderKey: folderKey,
-          quality: 1.0
+          preloadUrl: url
         });
       }
 
@@ -216,73 +185,36 @@
       }
 
       updateProgress(45, "Finding best compression quality...");
-
-      const totalTargetBytes = targetMB * 1024 * 1024;
+      const targetBytes = targetMB * 1024 * 1024;
       const origTotal = loadedImages.reduce((sum, i) => sum + i.origSize, 0);
 
-      if (origTotal <= totalTargetBytes) {
-        loadedImages.forEach(item => item.quality = 1.0);
+      if (origTotal <= targetBytes) {
         optimalQuality = 1.0;
         showResult(1.0, origTotal);
         return;
       }
 
-      const groups = new Map();
-      loadedImages.forEach(item => {
-        if (!groups.has(item.folderKey)) groups.set(item.folderKey, []);
-        groups.get(item.folderKey).push(item);
-      });
+      let low = 0.1, high = 1.0;
+      let bestQ = 0.1;
+      let bestTotal = Infinity;
 
-      const numGroups = groups.size;
-      updateProgress(48, `Optimizing ${numGroups} folder${numGroups > 1 ? 's' : ''}...`);
+      for (let i = 0; i < 12; i++) {
+        const mid = (low + high) / 2;
+        const total = await getTotalSize(mid);
+        const progress = 45 + Math.round((i + 1) / 12 * 55);
+        updateProgress(progress, `Testing quality ${Math.round(mid * 100)}%`);
 
-      const initialShare = totalTargetBytes / numGroups;
-      let sumSmall = 0;
-      const needyKeys = [];
-      const groupData = new Map();
-
-      groups.forEach((imgs, key) => {
-        const origT = imgs.reduce((s, i) => s + i.origSize, 0);
-        groupData.set(key, { images: imgs, origTotal: origT, optimalQ: 1.0, compressedTotal: origT });
-        if (origT <= initialShare) {
-          sumSmall += origT;
+        if (total <= targetBytes) {
+          bestQ = mid;
+          bestTotal = total;
+          low = mid;
         } else {
-          needyKeys.push(key);
-        }
-      });
-
-      const numNeedy = needyKeys.length;
-      if (numNeedy > 0) {
-        const remainingBudget = totalTargetBytes - sumSmall;
-        const perNeedyTarget = remainingBudget / numNeedy;
-
-        for (let i = 0; i < needyKeys.length; i++) {
-          const key = needyKeys[i];
-          const data = groupData.get(key);
-          const progress = 50 + Math.round((i + 1) / numNeedy * 45);
-          updateProgress(progress, `Optimizing folder ${i+1} of ${numNeedy}...`);
-
-          const {bestQ, bestTotal} = await findOptimalForGroup(data.images, perNeedyTarget, key, progress);
-          data.optimalQ = bestQ;
-          data.compressedTotal = bestTotal;
+          high = mid;
         }
       }
 
-      loadedImages.forEach(item => {
-        const data = groupData.get(item.folderKey);
-        if (data) item.quality = data.optimalQ;
-      });
-
-      const bestTotal = Array.from(groupData.values()).reduce((sum, d) => sum + d.compressedTotal, 0);
-      let weightedSum = 0, totalWeight = 0;
-      loadedImages.forEach(item => {
-        weightedSum += (item.quality || 1.0) * item.origSize;
-        totalWeight += item.origSize;
-      });
-      const displayQ = totalWeight > 0 ? weightedSum / totalWeight : 1.0;
-
-      optimalQuality = displayQ;
-      showResult(displayQ, bestTotal);
+      optimalQuality = Math.max(bestQ, 0.1);
+      showResult(optimalQuality, bestTotal);
     }
 
     function updateProgress(percent, message) {
@@ -291,80 +223,19 @@
       document.getElementById('loadingTitle').textContent = message;
     }
 
-    async function findOptimalForGroup(images, targetBytes, folderKey, currentProgress) {
-      const origTotal = images.reduce((sum, i) => sum + i.origSize, 0);
-      if (origTotal <= targetBytes) return {bestQ: 1.0, bestTotal: origTotal};
-
-      const sampleSize = Math.min(20, images.length);
-      const sampleImages = [...images].sort((a, b) => b.origSize - a.origSize).slice(0, sampleSize);
-      const sampleOrig = sampleImages.reduce((s, i) => s + i.origSize, 0);
-      const sampleTarget = targetBytes * (sampleOrig / origTotal);
-
-      let low = 0.1, high = 1.0;
-      let bestQ = 0.1;
-
-      for (let i = 0; i < 5; i++) {
-        const mid = (low + high) / 2;
-        const sampleTotal = await getGroupTotalSize(sampleImages, mid, folderKey, currentProgress);
-        if (sampleTotal <= sampleTarget) {
-          bestQ = mid;
-          low = mid;
-        } else {
-          high = mid;
-        }
-        await new Promise(r => setTimeout(r, 0));
-      }
-
-      const actualTotal = await getGroupTotalSize(images, bestQ, null, currentProgress);
-      return {bestQ: Math.max(bestQ, 0.1), bestTotal: actualTotal};
-    }
-
-    async function getGroupTotalSize(images, quality, folderKey = null, currentProgress = 50) {
-      const items = await getGroupCompressedBlobs(images, quality, folderKey, currentProgress);
+    async function getTotalSize(quality) {
+      const items = await getCompressedBlobs(quality);
       return items.reduce((sum, i) => sum + i.size, 0);
     }
 
-    async function getGroupCompressedBlobs(images, quality, folderKey = null, currentProgress = 50) {
-      if (folderKey === null) {
-        return Promise.all(images.map(async item => {
-          const canvas = document.createElement('canvas');
-          canvas.width = item.img.width;
-          canvas.height = item.img.height;
-          canvas.getContext('2d').drawImage(item.img, 0, 0);
-          const blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', quality));
-          return { size: blob.size };
-        }));
-      }
-
-      const results = [];
-      for (let idx = 0; idx < images.length; idx++) {
-        const item = images[idx];
-        const canvas = document.createElement('canvas');
-        canvas.width = item.img.width;
-        canvas.height = item.img.height;
-        canvas.getContext('2d').drawImage(item.img, 0, 0);
-        const blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', quality));
-        results.push({ size: blob.size });
-
-        updateProgress(
-          currentProgress,
-          `Testing ${item.zipPath.split('/').pop()} • ${Math.round(quality * 100)}% • ${idx + 1}/${images.length}`
-        );
-
-        await new Promise(r => setTimeout(r, 0));
-      }
-      return results;
-    }
-
-    async function getCompressedBlobs() {
+    async function getCompressedBlobs(quality) {
       return Promise.all(loadedImages.map(async item => {
         const canvas = document.createElement('canvas');
         canvas.width = item.img.width;
         canvas.height = item.img.height;
         canvas.getContext('2d').drawImage(item.img, 0, 0);
-        const quality = item.quality || 1.0;
         const blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', quality));
-        return { zipPath: item.zipPath, blob, size: blob.size };
+        return { name: item.name, blob, size: blob.size };
       }));
     }
 
@@ -380,12 +251,15 @@
     async function compressAndDownload() {
       const downloadBtn = document.getElementById('downloadBtn');
       const originalText = downloadBtn.innerHTML;
-      downloadBtn.innerHTML = `<span class="text-3xl">⏳</span><span>Creating ZIP...</span>`;
+      downloadBtn.innerHTML = `
+        <span class="text-3xl">⏳</span>
+        <span>Creating ZIP...</span>
+      `;
       downloadBtn.disabled = true;
 
-      const items = await getCompressedBlobs();
+      const items = await getCompressedBlobs(optimalQuality);
       const zip = new JSZip();
-      items.forEach(item => zip.file(item.zipPath, item.blob));
+      items.forEach(item => zip.file(item.name, item.blob));
       const zipBlob = await zip.generateAsync({ type: 'blob' });
 
       const url = URL.createObjectURL(zipBlob);
@@ -416,34 +290,6 @@
       document.getElementById('loadingOverlay').classList.add('hidden');
       document.getElementById('result').classList.add('hidden');
     }
-
-    window.addEventListener('load', () => {
-      const targetInput = document.getElementById('targetInput');
-      if (targetInput) {
-        targetInput.addEventListener('input', () => {
-          const val = targetInput.value.trim();
-          if (val === '') return;
-
-          const parsed = parseInt(val);
-          if (!isNaN(parsed) && parsed >= 1) {
-            targetMB = parsed;
-          }
-        });
-
-        targetInput.addEventListener('blur', () => {
-          if (targetInput.value.trim() === '') {
-            targetInput.value = targetMB;
-          }
-        });
-      }
-
-      const subsCheckbox = document.getElementById('subsCheckbox');
-      if (subsCheckbox) {
-        subsCheckbox.addEventListener('change', () => {
-          compressAllSubs = subsCheckbox.checked;
-        });
-      }
-    });
 
     window.addEventListener('beforeunload', () => {
       loadedImages.forEach(item => URL.revokeObjectURL(item.preloadUrl));
