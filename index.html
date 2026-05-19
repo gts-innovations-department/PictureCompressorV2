@@ -2,192 +2,411 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Image Compressor</title>
-
-<!-- Compression -->
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GTS Picture Compressor</title>
 <script src="https://cdn.jsdelivr.net/npm/browser-image-compression@2.0.2/dist/browser-image-compression.js"></script>
-
-<!-- HEIC Conversion -->
 <script src="https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js"></script>
-
-<!-- ZIP -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-
 <style>
+:root {
+    color-scheme: dark;
+    --bg: #0f1115;
+    --panel: #1a1f29;
+    --panel-2: #11161e;
+    --border: #2a3442;
+    --text: #f5f7fb;
+    --muted: #a8b3c2;
+    --primary: #2f8cff;
+    --primary-2: #60a5fa;
+    --success: #34c759;
+}
+
+* { box-sizing: border-box; }
+
 body {
-    background:#121212;
-    color:white;
-    font-family:Segoe UI;
-    display:flex;
-    justify-content:center;
-    padding:40px;
+    margin: 0;
+    min-height: 100vh;
+    background: radial-gradient(circle at top, #18202c 0%, var(--bg) 48%);
+    color: var(--text);
+    font-family: "Segoe UI", Arial, sans-serif;
+    display: flex;
+    justify-content: center;
+    padding: 28px 16px;
 }
 
 .card {
-    width:700px;
-    background:#1e1e1e;
-    padding:20px;
-    border-radius:12px;
-    border:2px solid #2a2a2a;
+    width: min(860px, 100%);
+    background: rgba(26, 31, 41, 0.96);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 24px;
+    box-shadow: 0 18px 60px rgba(0, 0, 0, 0.35);
+}
+
+.header {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.logo {
+    width: 72px;
+    height: 72px;
+    object-fit: contain;
+    background: white;
+    border-radius: 14px;
+    padding: 8px;
+}
+
+h1 {
+    margin: 0;
+    font-size: 1.8rem;
+}
+
+.subtitle,
+.helper,
+.progress-label,
+.summary {
+    color: var(--muted);
+}
+
+.subtitle {
+    margin: 6px 0 0;
+    line-height: 1.5;
+}
+
+.input-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 14px;
+    margin: 20px 0;
+}
+
+.input-card {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 16px;
+}
+
+.input-card label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 10px;
+}
+
+input[type="file"] {
+    width: 100%;
+    color: var(--muted);
+}
+
+.actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 10px;
 }
 
 button {
-    padding:10px 16px;
-    margin-right:10px;
-    border:none;
-    border-radius:8px;
-    background:#4caf50;
-    color:white;
-    font-weight:bold;
-    cursor:pointer;
+    border: none;
+    border-radius: 10px;
+    background: linear-gradient(180deg, var(--primary-2), var(--primary));
+    color: white;
+    font-weight: 700;
+    padding: 12px 16px;
+    cursor: pointer;
+    transition: transform 0.15s ease, opacity 0.15s ease;
+}
+
+button:hover:not(:disabled) {
+    transform: translateY(-1px);
+}
+
+button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
 }
 
 .progress {
-    width:100%;
-    height:20px;
-    background:#333;
-    border-radius:10px;
-    margin-top:10px;
+    width: 100%;
+    height: 18px;
+    background: #0d1218;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    overflow: hidden;
+    margin-top: 12px;
 }
 
 .bar {
-    height:100%;
-    width:0%;
-    background:#1e90ff;
-    border-radius:10px;
-    transition:width 0.2s;
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, var(--primary), #53b5ff);
+    transition: width 0.2s ease;
+}
+
+.progress-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    margin-top: 10px;
+    font-size: 0.95rem;
+}
+
+.summary {
+    margin-top: 10px;
+    min-height: 1.2em;
 }
 
 pre {
-    margin-top:15px;
-    background:#111;
-    padding:15px;
-    border-radius:8px;
-    color:#1e90ff;
-    max-height:250px;
-    overflow:auto;
+    margin-top: 16px;
+    margin-bottom: 0;
+    background: #0b1016;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 16px;
+    color: #8fd0ff;
+    min-height: 220px;
+    max-height: 360px;
+    overflow: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.helper {
+    margin-top: 12px;
+    line-height: 1.5;
+}
+
+code {
+    color: #bcd8ff;
+}
+
+@media (max-width: 640px) {
+    .card {
+        padding: 18px;
+    }
+
+    .header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .logo {
+        width: 60px;
+        height: 60px;
+    }
 }
 </style>
 </head>
-
 <body>
-
 <div class="card">
-    <input type="file" id="folderInput" webkitdirectory multiple>
+    <div class="header">
+        <img class="logo" src="GTSLOGOV1.png" alt="GTS logo">
+        <div>
+            <h1>GTS Picture Compressor</h1>
+            <p class="subtitle">Compress JPG, PNG, WEBP, HEIC, and HEIF images directly in your browser, then download everything as a ZIP. Nothing gets uploaded to a server.</p>
+        </div>
+    </div>
 
-    <div style="margin-top:10px;">
-        <button onclick="start(512)">Compress to 512 KB</button>
-        <button onclick="start(300)">Compress to 300 KB</button>
-        <button onclick="start(70)">Compress to 70 KB</button>
+    <div class="input-grid">
+        <div class="input-card">
+            <label for="fileInput">Choose image files</label>
+            <input type="file" id="fileInput" multiple accept=".jpg,.jpeg,.png,.webp,.heic,.heif,image/*">
+        </div>
+        <div class="input-card">
+            <label for="folderInput">Or choose a folder</label>
+            <input type="file" id="folderInput" webkitdirectory multiple>
+        </div>
+    </div>
+
+    <div class="actions">
+        <button data-target="512">Compress to 512 KB</button>
+        <button data-target="300">Compress to 300 KB</button>
+        <button data-target="70">Compress to 70 KB</button>
     </div>
 
     <div class="progress"><div class="bar" id="bar"></div></div>
+    <div class="progress-row">
+        <div class="progress-label" id="progressLabel">Idle</div>
+        <div class="progress-label" id="countLabel">0 / 0</div>
+    </div>
+    <div class="summary" id="summary"></div>
 
-    <pre id="log"></pre>
+    <pre id="log">Ready. Pick files or a folder, then choose a target size.</pre>
+
+    <p class="helper">Tip: if a picture is already smaller than the target, it stays as-is unless it needs HEIC conversion for browser compatibility.</p>
 </div>
 
 <script>
 const log = document.getElementById("log");
 const bar = document.getElementById("bar");
+const progressLabel = document.getElementById("progressLabel");
+const countLabel = document.getElementById("countLabel");
+const summary = document.getElementById("summary");
+const fileInput = document.getElementById("fileInput");
+const folderInput = document.getElementById("folderInput");
+const buttons = Array.from(document.querySelectorAll("button[data-target]"));
 
-function write(text) {
-    log.textContent += text + "\n";
+function write(text = "") {
+    log.textContent += `${text}\n`;
     log.scrollTop = log.scrollHeight;
 }
 
-// Detect HEIC
-function isHeic(file) {
-    return (
-        file.type === "image/heic" ||
-        file.type === "image/heif" ||
-        file.name.toLowerCase().endsWith(".heic") ||
-        file.name.toLowerCase().endsWith(".heif")
-    );
+function resetLog() {
+    log.textContent = "";
 }
 
-// Convert HEIC → JPEG and compress dynamically
-async function convertAndCompress(file, maxKB) {
-    let blob = file;
+function formatKB(bytes) {
+    return `${(bytes / 1024).toFixed(1)} KB`;
+}
 
-    if (isHeic(file)) {
-        write("CONVERTING: " + file.name);
+function isHeic(file) {
+    const name = file.name.toLowerCase();
+    return file.type === "image/heic" ||
+        file.type === "image/heif" ||
+        name.endsWith(".heic") ||
+        name.endsWith(".heif");
+}
 
-        const convertedBlob = await heic2any({
-            blob: file,
-            toType: "image/jpeg",
-            quality: 1.0
-        });
+function isSupportedImage(file) {
+    return file.type.startsWith("image/") || /\.(jpg|jpeg|png|webp|heic|heif)$/i.test(file.name);
+}
 
-        blob = new File(
-            [convertedBlob],
-            file.name.replace(/\.(heic|heif)$/i, ".jpg"),
-            { type: "image/jpeg" }
-        );
-    }
+function uniqueFiles(files) {
+    const seen = new Set();
+    return files.filter(file => {
+        const key = [file.name, file.size, file.lastModified].join("::");
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+    });
+}
 
-    // Compress to target KB
-    const compressed = await imageCompression(blob, {
-        maxSizeMB: maxKB / 1024,
-        useWebWorker: true,
-        maxWidthOrHeight: 8192
+function getSelectedImages() {
+    const combined = [...Array.from(fileInput.files || []), ...Array.from(folderInput.files || [])];
+    return uniqueFiles(combined).filter(isSupportedImage);
+}
+
+async function convertHeicToJpeg(file) {
+    write(`CONVERTING: ${file.name}`);
+    const convertedBlob = await heic2any({
+        blob: file,
+        toType: "image/jpeg",
+        quality: 0.92
     });
 
-    return compressed;
+    return new File(
+        [convertedBlob],
+        file.name.replace(/\.(heic|heif)$/i, ".jpg"),
+        { type: "image/jpeg", lastModified: Date.now() }
+    );
 }
 
-// Main
+async function convertAndCompress(file, maxKB) {
+    let workingFile = file;
+
+    if (isHeic(file)) {
+        workingFile = await convertHeicToJpeg(file);
+    }
+
+    if (!isHeic(file) && workingFile.size <= maxKB * 1024) {
+        return { file: workingFile, changed: false };
+    }
+
+    const compressed = await imageCompression(workingFile, {
+        maxSizeMB: maxKB / 1024,
+        maxWidthOrHeight: 8192,
+        useWebWorker: true,
+        initialQuality: 0.92,
+        alwaysKeepResolution: true,
+        maxIteration: 12
+    });
+
+    return { file: compressed, changed: true };
+}
+
+function setBusy(busy) {
+    buttons.forEach(button => button.disabled = busy);
+    fileInput.disabled = busy;
+    folderInput.disabled = busy;
+}
+
 async function start(maxKB) {
-    const input = document.getElementById("folderInput");
-    const files = Array.from(input.files);
+    const images = getSelectedImages();
 
-    if (!files.length) return alert("Select a folder first");
+    if (!images.length) {
+        alert("Select image files or a folder first.");
+        return;
+    }
 
-    const images = files.filter(f =>
-        f.type.startsWith("image/") ||
-        f.name.match(/\.(jpg|jpeg|png|webp|heic|heif)$/i)
-    );
-
-    log.textContent = "";
+    setBusy(true);
+    resetLog();
     bar.style.width = "0%";
-    bar.style.background = "#1e90ff";
+    bar.style.background = "linear-gradient(90deg, var(--primary), #53b5ff)";
+    progressLabel.textContent = `Compressing to ${maxKB} KB`;
+    countLabel.textContent = `0 / ${images.length}`;
+    summary.textContent = "";
 
     write(`Starting compression to ${maxKB} KB`);
-    write(`Total images: ${images.length}\n`);
+    write(`Images found: ${images.length}`);
+    write("");
 
     const zip = new JSZip();
     let done = 0;
+    let totalOriginal = 0;
+    let totalFinal = 0;
 
-    for (const file of images) {
-        try {
-            const finalFile = await convertAndCompress(file, maxKB);
-            zip.file(finalFile.name, finalFile);
+    try {
+        for (const image of images) {
+            totalOriginal += image.size;
 
-            done++;
-            bar.style.width = Math.round((done / images.length) * 100) + "%";
-            write("DONE: " + finalFile.name);
+            try {
+                const result = await convertAndCompress(image, maxKB);
+                const outputFile = result.file;
+                totalFinal += outputFile.size;
+                zip.file(outputFile.name, outputFile);
 
-        } catch (e) {
-            write("ERROR: " + file.name);
-            console.error(e);
+                done += 1;
+                bar.style.width = `${Math.round((done / images.length) * 100)}%`;
+                countLabel.textContent = `${done} / ${images.length}`;
+                write(`${result.changed ? "DONE" : "SKIPPED"}: ${outputFile.name} (${formatKB(image.size)} → ${formatKB(outputFile.size)})`);
+            } catch (error) {
+                done += 1;
+                bar.style.width = `${Math.round((done / images.length) * 100)}%`;
+                countLabel.textContent = `${done} / ${images.length}`;
+                write(`ERROR: ${image.name}`);
+                console.error(error);
+            }
         }
+
+        progressLabel.textContent = "Creating ZIP";
+        write("");
+        write("Creating ZIP...");
+
+        const blob = await zip.generateAsync({ type: "blob" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `compressed-images-${maxKB}kb.zip`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+
+        bar.style.background = "linear-gradient(90deg, #27c46b, var(--success))";
+        progressLabel.textContent = "Finished";
+        summary.textContent = `Original total: ${formatKB(totalOriginal)} | Output total: ${formatKB(totalFinal)} | Saved: ${formatKB(Math.max(totalOriginal - totalFinal, 0))}`;
+        write("");
+        write("✅ Finished");
+    } finally {
+        setBusy(false);
     }
-
-    write("\nCreating ZIP...");
-
-    const blob = await zip.generateAsync({ type: "blob" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "compressed_images.zip";
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-
-    bar.style.background = "#4caf50";
-    write("\n✅ Finished");
 }
-</script>
 
+buttons.forEach(button => {
+    button.addEventListener("click", () => start(Number(button.dataset.target)));
+});
+</script>
 </body>
 </html>
